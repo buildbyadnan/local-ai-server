@@ -159,15 +159,38 @@ Run `llama guide` for the full per-model manual.
 
 ## All commands
 
+### `llama` — this tool (every subcommand)
+
 | Command | What it does |
 |---|---|
-| *(no command)* | Guided recommender: checks Ollama, shows what you have, recommends a model. |
+| `llama` | Guided recommender (no command = same as `recommend`): checks Ollama, shows what you have, asks what you want to do, recommends a model. |
+| `llama recommend` | The guided recommender, spelled out explicitly. |
 | `llama guide` | Detailed manual for every model: good at / not good for / RAM. |
 | `llama catalog` | Compact table of all recommended models. |
-| `llama chat -m <model>` | Interactive chat. Type `exit` to quit. Omit `-m` to pick from a list. |
-| `llama run -m <model> "your prompt"` | One-shot question, answer streamed. Reads from stdin if you omit the prompt. |
+| `llama chat -m <model>` | Interactive chat. Type `exit` (or Ctrl-D) to quit. Omit `-m` to pick from a list. |
+| `llama run -m <model> "your prompt"` | One-shot question, answer streamed. Omit the prompt to read it from stdin. |
 | `llama models` | List models you already have installed. |
-| `llama ping` | Check that Ollama is running. |
+| `llama ping` | Check that Ollama is reachable. |
+| `llama help` | List commands (same as `llama --help`). `llama help chat` shows help for one command. |
+
+### Flags (work with any command)
+
+| Flag | What it does |
+|---|---|
+| `-m, --model <tag>` | Which model to use (e.g. `llama3.1:8b`). `run`/`chat` ask you interactively if omitted. |
+| `--system "<text>"` | Set the model's persona/rules for `run` and `chat`. |
+| `--host <url>` | Point at a different Ollama server (default `http://127.0.0.1:11434`). Env: `OLLAMA_HOST`. |
+| `-h, --help` | Show help — also per-command: `llama chat --help`. |
+| `-V, --version` | Print the version. |
+
+### Ollama commands you'll need (the free app `llama` drives)
+
+| Command | What it does |
+|---|---|
+| `ollama serve` | Start the Ollama server (Linux; on macOS/Windows just open the Ollama app). |
+| `ollama pull <tag>` | Download a model once — e.g. `ollama pull llama3.1:8b`. |
+| `ollama list` | Show installed models (same info as `llama models`). |
+| `ollama rm <tag>` | Delete a model to free disk space — e.g. `ollama rm codellama:13b`. |
 
 <details>
 <summary>Examples</summary>
@@ -179,8 +202,14 @@ llama run -m llama3.1:8b --system "You are terse." "Explain DNS in 3 sentences"
 # Pipe a prompt in:
 echo "Write a haiku about rust" | llama run -m llama3.1:8b
 
+# Interactive chat with the tiny model:
+llama chat -m llama3.2:3b
+
 # Point at an Ollama on another machine (or set OLLAMA_HOST):
 llama --host http://192.168.1.10:11434 ping
+
+# Get help for any command:
+llama run --help
 ```
 
 </details>
@@ -240,6 +269,23 @@ llama/
             ├── client.rs        # HTTP client (ping/list/generate/chat)
             └── stream.rs        # NDJSON → async stream of chunks
 ```
+
+### Publishing a release (maintainers)
+
+Pushing a `v*` tag is the **only** step that builds and publishes the prebuilt
+binaries the installers download:
+
+```bash
+git push origin main   # push your commits first
+
+git tag v0.1.0         # name the release (any v<number> works)
+git push origin v0.1.0 # triggers release.yml: builds 5 binaries (~5 min)
+```
+
+When the **Actions** → *release* workflow is green, the release (with all
+assets) appears at `https://github.com/buildbyadnan/local-ai-server/releases`,
+and `releases/latest/download/...` — used by `install.sh` / `install.ps1` —
+starts working.
 
 ### Design notes
 
