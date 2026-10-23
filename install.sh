@@ -5,7 +5,7 @@
 # Downloads the prebuilt `llama` binary for your OS/arch from this repo's
 # GitHub Releases, installs it to ~/.local/bin, and checks for Ollama.
 #
-#   curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash
+#   curl -fsSL https://raw.githubusercontent.com/buildbyadnan/local-ai-server/main/install.sh | bash
 #
 # (Or clone the repo and run ./install.sh .)
 #

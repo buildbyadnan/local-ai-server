@@ -4,7 +4,7 @@ version = "0.1.0"
 edition = "2021"
 description = "Run local open-source Llama models (≤30B) through a locally-running Ollama server"
 license = "MIT"
-repository = "https://github.com/OWNER/REPO" # <-- update after you create the GitHub repo
+repository = "https://github.com/buildbyadnan/local-ai-server"
 
 # Deliberately tiny dependency tree. `reqwest` has NO TLS backend (Ollama is
 # plain HTTP on localhost), so we avoid ring/openssl and any C toolchain

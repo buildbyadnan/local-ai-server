@@ -18,7 +18,7 @@ need, walks you through installing it, and then lets you chat with it.
 ### 🍎 macOS / 🐧 Linux
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/OWNER/REPO/main/install.sh | bash
+curl -fsSL https://raw.githubusercontent.com/buildbyadnan/local-ai-server/main/install.sh | bash
 ```
 
 *(Or clone this repo and run `./install.sh`.)*
@@ -39,7 +39,7 @@ chmod +x llama
 ### 🪟 Windows (PowerShell)
 
 ```powershell
-irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+irm https://raw.githubusercontent.com/buildbyadnan/local-ai-server/main/install.ps1 | iex
 ```
 
 <details>

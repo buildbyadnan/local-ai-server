@@ -4,7 +4,7 @@
 # installs it to %LOCALAPPDATA%\llama-cli, adds it to your user PATH,
 # and checks for Ollama.
 #
-#   irm https://raw.githubusercontent.com/OWNER/REPO/main/install.ps1 | iex
+#   irm https://raw.githubusercontent.com/buildbyadnan/local-ai-server/main/install.ps1 | iex
 #
 # (Or clone the repo and run:  powershell -ExecutionPolicy Bypass -File install.ps1)
 #
