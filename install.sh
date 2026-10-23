@@ -12,18 +12,9 @@
 set -euo pipefail
 
 # --- Which GitHub repo to fetch the release from? ---
-# Auto-detected from the git remote if you're inside a clone; otherwise set
-# LLAMA_REPO=owner/name before running.
-if [ -n "${LLAMA_REPO:-}" ]; then
-  REPO="$LLAMA_REPO"
-elif git remote get-url origin >/dev/null 2>&1; then
-  url="$(git remote get-url origin)"
-  REPO="$(printf '%s' "$url" | sed -E 's#(git@github\.com:|https://github\.com/)##; s#\.git$##')"
-else
-  echo "ERROR: couldn't detect the GitHub repo."
-  echo "  Set it and re-run, e.g.:  LLAMA_REPO=yourname/llama ./install.sh"
-  exit 1
-fi
+# Defaults to this repo. Override for a fork/mirror that publishes its own
+# releases:  LLAMA_REPO=owner/name ./install.sh
+REPO="${LLAMA_REPO:-buildbyadnan/local-ai-server}"
 
 # --- Detect OS + arch -> Rust target triple ---
 os="$(uname -s)"

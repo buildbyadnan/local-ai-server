@@ -14,21 +14,9 @@
 $ErrorActionPreference = "Stop"
 
 # --- Which GitHub repo to fetch the release from? ---
-# Auto-detected from the git remote if you're inside a clone; otherwise set
-# $env:LLAMA_REPO = "owner/name" before running.
-$Repo = $env:LLAMA_REPO
-if (-not $Repo) {
-    try {
-        $url = (git remote get-url origin 2>$null)
-        if ($url) {
-            $Repo = $url -replace '^git@github\.com:', '' -replace '^https://github\.com/', '' -replace '\.git$', ''
-        }
-    } catch { }
-}
-if (-not $Repo) {
-    Write-Error "Could not detect the GitHub repo. Set it and re-run, e.g.: `$env:LLAMA_REPO = 'yourname/llama'; .\install.ps1"
-    exit 1
-}
+# Defaults to this repo. Override for a fork/mirror that publishes its own
+# releases:  $env:LLAMA_REPO = "owner/name"; .\install.ps1
+$Repo = if ($env:LLAMA_REPO) { $env:LLAMA_REPO } else { "buildbyadnan/local-ai-server" }
 
 # --- Target triple (Windows x64 only) ---
 $Target = "x86_64-pc-windows-msvc"
