@@ -1,0 +1,18 @@
+# ---- Build artifacts ----
+/bazel-*
+/target/
+
+# ---- User's unrelated local file (do not publish) ----
+/split-100k-19.py
+
+# ---- OS cruft ----
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# ---- Editors / IDEs ----
+.vscode/
+.idea/
+*.swp
+*.swo
+*~

@@ -1,0 +1,3 @@
+[workspace]
+members = ["crates/llama-cli"]
+resolver = "2"

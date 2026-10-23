@@ -1,0 +1,5 @@
+# Build optimized by default.
+build -c opt
+
+# Hermetic, minimal action environment (reproducible builds).
+build --incompatible_strict_action_env

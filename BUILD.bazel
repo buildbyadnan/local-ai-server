@@ -1,0 +1,6 @@
+# Root package. The actual binary lives in //crates/llama-cli.
+#
+# NOTE: No filegroup here on purpose — a glob in this package must not reach
+# into the //crates/llama-cli subpackage (Bazel forbids globs crossing package
+# boundaries). Reference the target directly instead:
+#   bazel build -c opt //crates/llama-cli:llama-cli

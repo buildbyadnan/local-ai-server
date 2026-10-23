@@ -1,0 +1,38 @@
+load("@rules_rust//rust:defs.bzl", "rust_binary", "rust_test")
+
+package(default_visibility = ["//visibility:public"])
+
+rust_binary(
+    name = "llama-cli",
+    srcs = glob(["src/**/*.rs"]),
+    edition = "2021",
+    # Make `--version` show a real number (clap reads CARGO_PKG_VERSION).
+    rustc_env = {"CARGO_PKG_VERSION": "0.1.0"},
+    deps = [
+        "@crates//anyhow",
+        "@crates//bytes",
+        "@crates//clap",
+        "@crates//futures-util",
+        "@crates//libc",
+        "@crates//reqwest",
+        "@crates//serde",
+        "@crates//serde_json",
+        "@crates//tokio",
+    ],
+)
+
+# Offline unit tests (NDJSON decoding, catalog, types). No network, no models.
+rust_test(
+    name = "llama-cli_test",
+    crate = ":llama-cli",
+    size = "small",
+    edition = "2021",
+    deps = [
+        "@crates//bytes",
+        "@crates//futures-util",
+        "@crates//libc",
+        "@crates//reqwest",
+        "@crates//serde_json",
+        "@crates//tokio",
+    ],
+)
