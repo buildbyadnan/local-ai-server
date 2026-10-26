@@ -1,0 +1,5 @@
+# The web UI (Next.js) is built with pnpm, not Bazel — see crates/web/README.md.
+# Ignoring the crate keeps `bazel build //...` scoped to the Rust binary and
+# stops package discovery from ever crawling node_modules (npm packages can
+# ship their own BUILD files).
+crates/web

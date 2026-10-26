@@ -247,6 +247,20 @@ bazel test //crates/llama-cli:llama-cli_test
 > After changing dependencies in `crates/llama-cli/Cargo.toml`, run
 > `cargo build` and then `CARGO_BAZEL_REPIN=1 bazel build //...` to re-pin Bazel.
 
+### Web UI (`crates/web`)
+
+A local-only Next.js chat interface for the same Ollama backend — a side crate
+that never ships. It builds with **pnpm**, not Bazel (`.bazelignore` keeps it
+out of `//...`), and CI lints + builds it alongside the Cargo matrix:
+
+```bash
+cd crates/web
+pnpm install
+pnpm dev        # http://localhost:3000
+```
+
+See [`crates/web/README.md`](crates/web/README.md) for the full tour.
+
 ### Project layout
 
 ```
@@ -256,18 +270,24 @@ llama/
 ├── .bazelversion / .bazelrc     # pins Bazel 9.3.1
 ├── install.sh / install.ps1     # prebuilt-binary installers (mac/linux, windows)
 ├── .github/workflows/
-│   ├── ci.yml                   # tests on Linux/macOS/Windows
+│   ├── ci.yml                   # tests on Linux/macOS/Windows + web lint/build
 │   └── release.yml              # builds release binaries on a v* tag
-└── crates/llama-cli/
-    ├── Cargo.toml / BUILD.bazel
-    └── src/
-        ├── main.rs              # subcommand dispatch + guided recommender
-        ├── cli.rs               # clap definitions
-        ├── catalog.rs           # the ≤30B model catalog, guide, and recommender
-        └── ollama/
-            ├── types.rs         # serde structs for Ollama's /api/* JSON
-            ├── client.rs        # HTTP client (ping/list/generate/chat)
-            └── stream.rs        # NDJSON → async stream of chunks
+└── crates/
+    ├── llama-cli/
+    │   ├── Cargo.toml / BUILD.bazel
+    │   └── src/
+    │       ├── main.rs          # subcommand dispatch + guided recommender
+    │       ├── cli.rs           # clap definitions
+    │       ├── catalog.rs       # the ≤30B model catalog, guide, and recommender
+    │       └── ollama/
+    │           ├── types.rs     # serde structs for Ollama's /api/* JSON
+    │           ├── client.rs    # HTTP client (ping/list/generate/chat)
+    │           └── stream.rs    # NDJSON → async stream of chunks
+    └── web/                     # Next.js UI (pnpm; ignored by Bazel)
+        ├── app/                 # routes + globals.css
+        ├── components/          # Sidebar / CenterChat / AiModule
+        ├── data/                # chat history + the 19-model guide registry
+        └── proxy.ts             # real-404 gate for unknown model slugs
 ```
 
 ### Publishing a release (maintainers)

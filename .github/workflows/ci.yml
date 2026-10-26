@@ -1,6 +1,7 @@
 name: ci
 
-# Run the test suite on every push / pull request, across the main platforms.
+# Run the test suite on every push / pull request, across the main platforms,
+# and lint + build the web UI crate.
 
 on:
   push:
@@ -26,3 +27,31 @@ jobs:
 
       - name: Test
         run: cargo test --locked
+
+  web:
+    name: web (lint + build)
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: crates/web
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 12
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: pnpm
+          cache-dependency-path: crates/web/pnpm-lock.yaml
+
+      - name: Install
+        run: pnpm install --frozen-lockfile
+
+      - name: Lint
+        run: pnpm lint
+
+      - name: Build
+        run: pnpm build
