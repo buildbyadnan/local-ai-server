@@ -1,7 +1,10 @@
 # Plan — Local AI Server: UI ↔ Ollama / `llama` CLI connectivity
 
-Status: **revised after audit round 2 of 3** — round-1 and round-2 findings
-folded in; next: round 3 audit, revise, then implement.
+Status: **revised after audit round 3 of 3 — final.** Three audit rounds
+complete (round 1: 3 auditors × 24 findings; round 2: 2 auditors × 20
+findings; round 3: 2 auditors × 30 findings, zero blockers); every finding
+folded in; §11 records the decisions the auditors asked for. Ready to
+implement M1→M4 (§9).
 Scope: turn the static web UI into a working local chat product: detect
 Ollama, guide installation, show the models already on this machine, let the
 user select and chat with them (real streaming), and pull new models from the
@@ -11,37 +14,41 @@ catalog — all local, nothing shipped to production.
 
 ## 0. Revision log
 
-**Round 1 → rev. 1 (commit `e389971`)** — 24 findings folded in; round-2
-auditors re-verified all six blockers and confirmed the core amendments
-request-time pinning, Response passthrough, corrected vision tags,
-mount-only localStorage, persistence owned by M4, corrected `DEFAULT_TAG`
-as doc-accurate. Cross-reference pointers in this §0 table are corrected
-below where round 2 found them stale.
+- **Round 1 → rev. 1 (`e389971`):** 24 findings, all eight BLOCKERs folded
+  (request-time pinning, Response passthrough, live status, session restore,
+  serve command, vision tags, mount-only localStorage, M2↔M4 ownership).
+  Round 2 re-verified the six doc-dependent amendments as accurate.
+- **Round 2 → rev. 2 (`861fb09`):** 20 findings folded (route-count gate vs
+  named artifacts, streaming error paths, `paramsBillions` matching rules,
+  restore click target, loopback guards, pull state ownership, copy table,
+  state matrix rows 1–33, scoped QA sweeps).
+- **Round 3 → this revision:** both final auditors returned "amend first"
+  with **zero blockers**; fixes:
 
-**Round 2 → this revision** — both auditors verdict "amend first"; fixes:
-
-| # | Finding (round 2) | Fix |
+| # | Finding (round 3) | Fix |
 |---|---|---|
-| R2-1 | **BLOCKER** route-count gate arithmetically impossible (no artifact goes 24→27) | §10.1 — named artifacts + commands |
-| R2-2 | **BLOCKER** §3.4 sketch lacks error paths (503 / AbortError) accepted against elsewhere | §3.4 — full try/catch sketch; §5.3 `response.ok` branch |
-| R2-3 | **BLOCKER** §6 matching rules depend on nonexistent "bands"; rule 3 would badge non-Llama models | §6 — `paramsBillions` field + family-first rules adapted from `catalog_entry_for` |
-| R2-4 | **BLOCKER** §5.5 restore has no click target; "New chat" button doesn't exist | §5.5 — session rows above the raw JSON + named control |
-| R2-5 | §0 cross-references misrouted (6 rows) | §0 — pointers corrected |
-| R2-6 | forbidden-string sweep unpassable (`query` ×15 in source) | §10.4 — scoped: v1 list → built HTML; new list → source; runs after M4 |
-| R2-7 | `pnpm dev` also binds `0.0.0.0` (LAN exposure) | §3.6 — loopback mandatory for dev **and** prod |
-| R2-8 | Origin guard Host-spoofable (DNS rebinding); GET status unguarded | §3.2 — loopback allowlist + Host check on every route |
-| R2-9 | `execFile("ollama")` Windows/PATH unspecified | §4.1 — `.exe` on win32, env, fallback paths, `onPath` |
-| R2-10 | two `pullSize`s ~2× wrong; "locked by test" had no mechanism | §6 — corrected sizes + asserted value table |
-| R2-11 | forbidden exports under-listed (`fetchCache`, `dynamicParams`) | §3.3 — full list |
-| R2-12 | two owners for status fetch; pull flag non-reactive module var | §5.1/§5.2 — `ModelProvider` owns all fetching + pull state |
-| R2-13 | multi-tab merge keyed on immutable `created_at` (silent loss) | §5.5 — `updated_at` + tie-break, merge never writes back |
-| R2-14 | M1 honesty gap (`CANNED_REPLY` alive under a green pill); §10 "every milestone" impossible | §9/§10 — canned reply dies in **M1**; per-milestone QA subsets |
-| R2-15 | pixel-diff gate implies tooling §10.3 forbids | §10.6 — manual diff vs committed references, recorded in `qa/README` |
-| R2-16 | matrix rows 2 vs 22 undetectable + false advice | §7 — merged, host visible in copy (CLI voice) |
-| R2-17 | missing matrix rows (Stop, 413, checking, bad JSON line, pull drop, switch mid-stream) | §7 — rows 28–33 |
-| R2-18 | copy gaps (lowercase "ollama", hardcoded `⚡ llama` picker, "on the left", 3-vs-4 states, `systemctl --user`) | §8 — rows added |
-| R2-19 | history flash/`N of M` meta, restore lifecycle underspecified | §5.5 — hydration skeleton + 4 lifecycle bullets |
-| R2-20 | misc: M1 Stop reference, unused status fields, `--debug-prerender` wording, `start` script drift, IPv6 note | §4.1, §9, §10, §11 |
+| R3-1 | **MAJOR** Host allowlist as enumerated rejects `Host: 127.0.0.1:<port>` — the plan's own QA traffic | §3.2 — parse rule (strip port/brackets; hostname ∈ loopback set) |
+| R3-2 | **MAJOR** §10.5 row 1 ("not installed") unrenderable on the reference machine | §4.1 + §10.5 — `OLLAMA_BIN_PATHS` QA override + recipes for rows 1/2b/3 |
+| R3-3 | **MAJOR** history search left unspecified after the JSON redesign | §5.5 + §8 — search filters rows, auto-open kept, meta variants, zero-result copy |
+| R3-4 | **MAJOR** session rows/`＋ New chat` unguarded mid-stream (tokens land in wrong session) | §5.5 + §7 row 38 |
+| R3-5 | **MAJOR** persistence timing unspecified (Stop/error replies lost) | §5.5 — three write points; §7 row 35 |
+| R3-6 | **MAJOR** restored session's model vs picker selection collision | §5.5 — silent programmatic `setSelected`, read-only fallback, send stamps model |
+| R3-7 | **MAJOR** history-lifecycle rules had no §7 rows (journey step 4 untested) | §7 rows 34–38 + subsets |
+| R3-8 | **MAJOR** §7 milestone column ≠ §10.5 subsets (rows 3, 18) | §10.5 — aligned |
+| R3-9 | **MAJOR** §8 missed `layout.tsx` metadata, line-keyed afters, precedence clause | §8 — rows + normative clause |
+| R3-10 | **MAJOR** List B scope omits `README.md` + doesn't exclude `node_modules` | §10.4 — scope fixed |
+| R3-11 | **MAJOR** 20 `.histrow`s blow the round-1 space math unboundedly | §5.5 — `max-height: min(40vh, 300px)` cap + restated math + QA threshold |
+| R3-12 | MINOR `.next/functions-config-manifest.json` path wrong | §10.1 — `.next/server/…`, stays 1 `/_middleware` |
+| R3-13 | MINOR forbidden-export citations don't cover `runtime` | §3.3 — cite `02-route-segment-config/index.md:25` + `runtime.md:24` |
+| R3-14 | MINOR execFile-at-build nuance order-dependent vs §3.4 guard-first | §3.3/§4.1 — guard order pinned, mechanism corrected, catches stay mandatory |
+| R3-15 | MINOR `--debug-prerender` aside was an invalid inference | §10.1 — reworded as diagnostic for any prerender error |
+| R3-16 | MINOR curl smoke lacked `Content-Type` (guard would 400 it) | §10.2 — full command + exit-18 note |
+| R3-17 | MINOR §0 stale pointer (R2-6), "six blockers" → eight, dead cross-ref sentence | §0 — cleaned |
+| R3-18 | MINOR copy divergences (§5.1/§7 vs §8; starter link; >30B literal `≈245 GB`) | §8 precedence + §5.4 interpolates `pullSize` |
+| R3-19 | MINOR M1 Send behavior + seed-history honesty | §9 — input disabled at M1; seed explicitly noted as placeholder |
+| R3-20 | MINOR multi-tab removal resurrection; README/CI enumeration; journey "first" wording | §5.5, §9, §1 |
+| R3-21 | MINOR §10.3 fixtures missing `parameter_size` inputs; §6 quoted a nonexistent term | §6, §10.3 — fixtures listed, phrase reworded |
+| R3-22 | NITs: line refs (`catalog.rs:206-229`, `client.rs:114-119`), `qwen2.5:7b` test, LOCALAPPDATA expansion, `safeMessage` undefined, guard contract, Origin-port source, per-milestone test tags, vitest alias, title/trim rules, meta pre-hydration, heights in §10.6 | folded in at each site |
 
 ---
 
@@ -55,7 +62,7 @@ a thin client to a local Ollama server. The UI becomes the second client.
 - Local-only: no cloud, no accounts, no telemetry; data stays in the browser.
 - Honest states: never pretend a model answered when nothing ran — and never
   claim persistence/connectedness the UI doesn't have (§9 keeps M1 honest).
-- Plain language: install/status/pull copy for humans (§8 is the contract).
+- Plain language: install/status/pull copy for humans (§8 is normative).
 - No unnecessary code: every field, file, and state earns its place.
 
 **The user journey this plan delivers:**
@@ -63,10 +70,12 @@ a thin client to a local Ollama server. The UI becomes the second client.
    directly below the sidebar's *Plugins* item explains how to install it
    (detected-OS command first), with a live status pill and Re-check.
 2. Ollama **installed but not running** → told how to start it on *their* OS.
-3. Ollama **running** → the models already on this machine appear first in the
-   picker, pre-selecting one.
+3. Ollama **running** → the models already on this machine *are* the picker's
+   options (installed only), pre-selecting the first; the tree is the path to
+   models you don't have.
 4. User **selects a model and chats** → real token streaming, Stop, sessions
-   saved locally and restorable.
+   saved locally (on every stream end — including Stop and errors) and
+   restorable.
 5. User wants a model they **don't have** → Pull from the tree with live
    progress → auto-select → chat.
 
@@ -80,26 +89,28 @@ the terminal client; no Rust changes are required for v1.
 
 - Ollama **0.40.8** installed (`/usr/local/bin/ollama`), `ollama serve`
   running; models present: **llama3.1:8b** (4.9 GB), **llama3.2:latest**
-  (2.0 GB); nothing loaded (`/api/ps` → empty).
+  (2.0 GB); nothing loaded (`/api/ps` → empty). `details.parameter_size`
+  values: `"8.0B"`, `"3.2B"` (these strings drive §6's parse rule).
 - The `llama` CLI is a thin HTTP client over `http://127.0.0.1:11434`
   (host via `--host` / `OLLAMA_HOST`) using exactly `GET /api/tags`,
   `POST /api/generate`, `POST /api/chat` (NDJSON: `{message:{content},
   done, error}`).
 - `catalog.rs`: `DEFAULT_TAG = "llama3.1:8b"` (line 162);
-  `catalog_entry_for(installed)` (lines 206–236) matches an installed model
-  to a catalog entry in two steps: **exact tag**, else **same base name +
-  ≤25 % relative deviation from the entry's nominal params, nearest wins**.
-  §6 adapts exactly this (family constraint included — a `mistral:7b` must
-  never badge a Llama guide, per the CLI's own test `catalog.rs:417-430`).
+  `catalog_entry_for(installed)` (lines **206–229**) matches an installed
+  model in two steps: **exact tag**, else **same base name + ≤25 % relative
+  deviation from nominal params, nearest wins**. `parse_billions`
+  (lines 186–195) extracts the leading `[0-9.]` run from a
+  `parameter_size` string and `parseFloat`s it. §6 adapts exactly this.
 - Ollama pull API (docs.ollama.com, v0.40.8): `POST /api/pull`
   `{"model": "<tag>"}` streams NDJSON: `{"status":"pulling manifest"}` →
   `{"status":"downloading <digest>","digest","total","completed"}` →
   `{"status":"success"}`; failures arrive as `{"error": "..."}` lines on
   HTTP 200. Content type `application/x-ndjson`.
-- All 15 tags in §6's table were confirmed present in the registry
-  (`registry.ollama.ai/v2/library/<name>/manifests/<tag>` → 200, round 2);
-  sizes corrected against Σ manifest layers. `ollama show` cannot verify an
-  **uninstalled** tag — registry/library checks only.
+- All 15 tags in §6 confirmed present in the registry (round 2); sizes are
+  Σ registry manifest layers. `ollama show` cannot verify an **uninstalled**
+  tag — registry/library checks only. Registry manifests carry **no**
+  `parameter_size` (that field exists only on installed models) — §6's
+  values come from published model specs (provenance noted in §10.3).
 
 ---
 
@@ -144,36 +155,43 @@ server process, `llama models` prints human text. v1 = zero Rust changes.
 | `POST /api/ollama/chat` | Host + Origin + content-type (§3.2) | `{model, messages[]}` | NDJSON stream (Ollama passthrough) |
 | `POST /api/ollama/pull` | Host + Origin + content-type (§3.2) | `{model}` | NDJSON progress (Ollama passthrough) |
 
+**Guard contract:** each guard function returns a ready-made `Response` on
+failure and `null` on success — callers write `if (const err = guard(req))
+return err;` (guards run first, in the §3.4 order).
+
 ### 3.2 Shared server helper — `lib/ollama.ts` (server-only)
 
 - `base()` → `process.env.OLLAMA_HOST ?? "http://127.0.0.1:11434"`, trimmed
   of trailing `/` (identical fallback to the CLI's clap default).
-- `requireLoopbackHost(request)` — **applied to all three routes, including
-  GET**: the request's `Host` header must be `localhost`, `127.0.0.1`,
-  `[::1]` or `localhost:<port>` form (loopback only). This is the
-  DNS-rebinding backstop: an attacker page re-bound to 127.0.0.1 arrives with
-  a foreign `Host` and is rejected before touching Ollama. Failure →
-  `403 {error}`.
-- `requireLocalPost(request)` — for both POST routes: additionally requires
+- `requireLoopbackHost(request)` — **all three routes, including GET**.
+  Parse rule (round 3 fixed the enumeration): take the `Host` header, strip
+  an optional `:port` and any `[]` brackets → `hostname`; accept iff
+  `hostname ∈ {localhost, 127.0.0.1, ::1}` — **any port is fine** (so
+  `Host: 127.0.0.1:3000`, `[::1]:3000`, `localhost` all pass; the QA URLs
+  in §3.6/§10.2 are exactly these forms). Failure → `403 {error}`. This is
+  the DNS-rebinding backstop: a re-bound attacker page arrives with a
+  foreign `Host` and is rejected before touching Ollama.
+- `requireLocalPost(request)` — both POST routes additionally require
   `Content-Type: application/json` and, **when an `Origin` is present**, that
-  its host is loopback **and** its port equals this request's port (pinned
-  allowlist — not "matches the Host header", which a rebind would forge);
-  `Origin: null` is rejected. Origin-absent requests (curl, same-origin
-  same-method GETs) are accepted — the mandatory JSON content-type is what
-  blocks cross-site browser POSTs in practice (they'd preflight, and we send
-  no CORS headers). Failure → `400`/`403 {error}`.
+  its hostname is loopback **and** its port equals the port parsed from the
+  already-validated `Host` header (the handler has no socket access; the Host
+  port is the source of truth; Host absent → default 80/443 by protocol —
+  in practice always present). `Origin: null` → reject. Origin-absent
+  requests (curl) are accepted — the mandatory JSON content-type is what
+  blocks cross-site browser POSTs (they'd preflight; we send no CORS
+  headers). Failure → `400`/`403 {error}`.
 - `readJsonBody(request, maxBytes = 1 MiB)` — running byte counter; over the
-  cap → `413 {error}` before parsing. **Effective cap note:** 1 MiB of JSON
-  ≈ well under the nominal `100 × 32 000` message limits — the byte cap is
-  the real constraint; §7 row 30 covers the overflow UX.
+  cap → returns a ready-made `413 {error}` Response; on success returns the
+  parsed object. **Contract: `Response | null`** (never an error envelope —
+  round 3: a client payload containing an `error` key must not short-circuit
+  validation). Effective cap: 1 MiB of JSON is the real limit (§7 row 30).
 - `isValidTag(tag)` — `^[a-z0-9][a-z0-9._/-]{0,127}(?::[a-z0-9._-]{1,64})?$`
-  (**lowercase only** — Ollama registry tags are lowercase; uppercase is
-  rejected, which the §10.3 test asserts).
+  (lowercase only; uppercase `llama3:8B` is rejected — asserted §10.3).
 - `ollamaFetch(path, init, timeoutMs)` — `fetch(base() + path, {cache:
   "no-store", signal, ...init})` with AbortSignal timeouts (2 s for status,
   none for streams). Rejects fast when Ollama is down.
 
-### 3.3 Request-time semantics — pinned (round 1, re-verified round 2)
+### 3.3 Request-time semantics — pinned (rounds 1 & 3)
 
 Per `node_modules/next/dist/docs/01-app/01-getting-started/15-route-handlers.md`
 lines 87–124: under Cache Components, GET route handlers **run at request
@@ -181,36 +199,39 @@ time by default**; prerendering stops when a handler accesses **network
 requests**, request-object properties, or `connection()`.
 
 **Implementation rules (no exceptions):**
-- Do **not** export any segment config from `app/api/**/route.ts`. Forbidden
-  (they error, per `migrating-to-cache-components.md:74,652` and `route.md`):
-  `dynamic`, `revalidate`, `fetchCache`, `runtime`, `dynamicParams`
-  (`preferredRegion` is deprecated too). Request-time behavior comes from
-  touching the network/request, not config flags.
-- The **network fetch** is what guarantees non-prerendering. Important
-  nuance (round 2): `process.env` reads and `execFile` are **not** tracked
-  dynamic APIs — **`execFile("ollama", …)` actually executes at build time**
-  (twice: prospective + final render), and *any uncaught rejection in the GET
-  handler fails `pnpm build`*. Therefore every promise in the status handler
-  is caught with a fallback (`installed: false`, `[]`, …) — §4.1's fallbacks
-  are build-breaking requirements, not just runtime politeness.
+- Do **not** export any segment config from `app/api/**/route.ts`. Forbidden:
+  `dynamic`, `revalidate`, `fetchCache`, `dynamicParams` (they error —
+  `02-route-segment-config/index.md:25`, `migrating-to-cache-components.md:74,652`),
+  `runtime` (explicitly unsupported under Cache Components —
+  `02-route-segment-config/runtime.md:24`: "remove the `runtime` export,
+  including `runtime = 'nodejs'`"), `preferredRegion` (deprecated).
+  Request-time behavior comes from touching the network/request, not flags.
+- **Guard order is part of this contract** (round 3): the Host guard reads
+  `request.headers` *before* anything else (§3.4), so a prospective
+  prerender bails at that synchronous request-data access and the handler
+  body — including `execFile` — **never runs at build**. Catches around
+  every promise remain mandatory anyway: at runtime an uncaught rejection in
+  the GET handler takes the route down, and if anyone reorders the handler
+  so a promise runs before the first request access, an uncaught rejection
+  fails `pnpm build`. Fallbacks in §4.1 are therefore load-bearing.
+- The **network fetch** is what guarantees non-prerendering (the documented
+  bail). `process.env` reads alone are *not* dynamic.
 - Status fetches use `cache: "no-store"`; responses send
-  `Cache-Control: no-store` so neither data cache nor browser holds a stale
-  pill. (Only GET is ever prerenderable — reading `Origin` on POST is safe.)
-- Acceptance (§10.2): `GET /api/ollama/status` reflects live Ollama state
-  after `ollama serve` is killed/restarted, with no rebuild, and
-  `.next/prerender-manifest.json` still contains **no** `/api/*` entries.
+  `Cache-Control: no-store`. (Only GET is ever prerenderable — reading
+  `Origin` on POST is safe.)
+- Acceptance (§10.2): status reflects live Ollama state after
+  `ollama serve` is killed/restarted with no rebuild, and
+  `.next/prerender-manifest.json` contains **no** `/api/*` entries.
 
-### 3.4 Streaming passthrough — exact pattern (round 1; error paths added round 2)
-
-Route handlers return a `Response`; there is no Node-style `res` piping API.
+### 3.4 Streaming passthrough — exact pattern
 
 ```ts
 // app/api/ollama/chat/route.ts (the authoritative shape)
-const guard = requireLoopbackHost(request) ?? requireLocalPost(request);
-if (guard) return guard;                          // 403/400 before touching Ollama
+if (const err = requireLoopbackHost(request)) return err;
+if (const err = requireLocalPost(request)) return err;
 
-const body = await readJsonBody(request);         // 413 over 1 MiB
-if (body.error) return Response.json(body, { status: body.status });
+const parsed = await readJsonBody(request);       // Response if over 1 MiB
+if (parsed instanceof Response) return parsed;
 // …validate model/messages (§4.2) → 400 on violation…
 
 let upstream: Response;
@@ -219,7 +240,7 @@ try {
     method: "POST",
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ model, messages, stream: true }),
-    signal: request.signal,                       // §3.5 — client abort reaches Ollama
+    signal: request.signal,        // §3.5 — client abort reaches Ollama
   });
 } catch (err) {
   if (err instanceof DOMException && err.name === "AbortError") {
@@ -228,41 +249,41 @@ try {
   return Response.json({ error: "Ollama isn't running." }, { status: 503 });
 }
 if (!upstream.ok || !upstream.body) {
+  // safeMessage: try JSON.parse(await upstream.text()).error,
+  // fall back to `upstream.statusText || "Ollama returned an error."`
   return Response.json({ error: await safeMessage(upstream) }, { status: 502 });
 }
 return new Response(upstream.body, {
   headers: {
     "Content-Type": "application/x-ndjson",
-    "Cache-Control": "no-store, no-transform",
+    "Cache-Control: "no-store, no-transform",
   },
 });
 ```
 
-- Ollama reports some errors (bad tag, context overflow) as `{"error"}`
-  lines on HTTP 200 — passed through and parsed client-side (§5.3).
-  Transport failures are mapped above **before** streaming starts.
+- Ollama's on-200 `{"error"}` lines (bad tag, context overflow) pass through
+  and are parsed client-side (§5.3); transport failures map to 503/502
+  **before** streaming starts.
 - **Client side:** if `!response.ok`, read the JSON `{error}` and enter the
-  corresponding state instead of opening a stream reader (§5.3).
+  corresponding state — never open a stream reader on an error response.
 - **Compression:** the mandated `no-transform` already excludes these routes
   from Next's gzip (vendored `compression` honors it), so §10.2 measures
-  first-byte latency with gzip out of the picture. `compress: false` in
-  `next.config.ts` remains a documented whole-server fallback if latency
-  still exceeds budget for *other* reasons (then suspect Ollama itself).
+  first-byte latency with gzip out of the picture; `compress: false` remains
+  a whole-server fallback for other routes if ever needed.
 
-### 3.5 Abort propagation (round 1; acceptance wording fixed round 2)
+### 3.5 Abort propagation
 
-Mechanism (in-tree source, no doc covers it): `build/templates/app-route.js`
+Mechanism (in-tree source; no doc covers it): `build/templates/app-route.js`
 wires `signalFromNodeResponse(res)` into every route-handler `NextRequest`;
 the adapter aborts it on response `'close'` when not fully written
 (`server/web/spec-extension/adapters/next-request.js:45-63`). Passing
-`request.signal` into the upstream `fetch` therefore destroys the TCP
-connection to `:11434`, and Go's http server cancels the request context —
-Ollama stops generating. Acceptance: **Stop/abort mid-stream → generation
-stops (`ollama ps` shows the model going idle within its normal unload
-window), and the Next server log has no unhandled rejection.** A lagging
-unload is not a failure.
+`request.signal` into the upstream `fetch` destroys the TCP connection to
+`:11434`; Go's http server cancels the request context — Ollama stops
+generating. Acceptance: **abort mid-stream → generation stops (`ollama ps`
+idles within the model's normal unload window), server log has no unhandled
+rejection.** A lagging unload is not a failure.
 
-### 3.6 Serving locally — loopback mandatory (round 1; extended round 2)
+### 3.6 Serving locally — loopback mandatory
 
 ```bash
 pnpm exec next dev   -H 127.0.0.1   # dev, loopback only
@@ -270,15 +291,13 @@ pnpm exec next start -H 127.0.0.1   # production build, loopback only
 ```
 
 - **Both** default to binding `0.0.0.0` (CLI docs `06-cli/next.md:64-71,
-  112-123`) — combined with the "Origin-absent → accepted" rule, a bare dev
-  server would let any machine on the LAN drive Ollama through us. Loopback
-  binding is a product rule, not a nicety.
-- `pnpm start -- -H …` is **not** used: the documented, unambiguous path is
-  `pnpm exec next …` (pnpm arg-forwarding to `next start` is the kind of
-  behavior change we don't want to depend on).
-- `-H 127.0.0.1` is IPv4 loopback only: QA commands use
-  `http://127.0.0.1:<port>` URLs, not `localhost` (some resolvers prefer
-  `::1`). M4 changes the `package.json` `start` script to
+  112-123`) — with "Origin-absent → accepted", a bare dev server would let
+  any LAN machine drive Ollama through us. Loopback binding is a product
+  rule. `pnpm exec next …` is the documented, unambiguous path (we don't
+  depend on pnpm's arg-forwarding behavior).
+- IPv4 loopback only: QA commands use `http://127.0.0.1:<port>` (some
+  resolvers prefer `::1` for `localhost`).
+- M4 changes the `package.json` `start` script to
   `next start -H 127.0.0.1` so the default can't be exposed by accident.
 
 ---
@@ -287,42 +306,48 @@ pnpm exec next start -H 127.0.0.1   # production build, loopback only
 
 ### 4.1 `GET /api/ollama/status`
 
+**Order (pinned, §3.3):** guard → `execFile` → network fetches.
+
 1. `installed` + `onPath`: `execFile(process.platform === "win32" ?
    "ollama.exe" : "ollama", ["--version"], { timeout: 2000, env:
-   process.env })` — `execFile` never spawns a shell (fixed argv, no
-   injection); route handlers default to the Node runtime (no `runtime`
-   export exists to change it). If PATH lookup fails (ENOENT), retry known
-   install locations — `%LOCALAPPDATA%\Programs\Ollama\ollama.exe` (Windows),
-   `/usr/local/bin/ollama` (Linux), `/Applications/Ollama.app/Contents/
-   Resources/ollama` (macOS). Found only via fallback → `installed: true,
-   onPath: false` so the UI can say "installed but not on PATH" instead of
-   lying "not installed" (GUI-launched servers often lack user PATH).
-   **Every outcome is caught** — an uncaught rejection here fails the build
-   (§3.3).
+   process.env })` — fixed argv, no shell (no injection). PATH miss (ENOENT)
+   or a >2 s timeout (AV scan) → retry fallback locations, paths **built with
+   `path.join`** (no `%VAR%` expansion in `execFile`):
+   - Windows: `path.join(process.env.LOCALAPPDATA, "Programs", "Ollama",
+     "ollama.exe")`
+   - Linux/macOS: `/usr/local/bin/ollama` (both installers use it),
+     `/Applications/Ollama.app/Contents/Resources/ollama` (macOS app),
+     `/usr/bin/ollama`.
+   Found only via fallback → `installed: true, onPath: false` (GUI-launched
+   servers often lack user PATH — the UI says "installed but not on your
+   PATH", never "not installed"). **QA override:** `OLLAMA_BIN_PATHS`
+   (comma-separated; empty string forces `installed: false`) replaces the
+   candidate list so row 1 is renderable on this machine (§10.5).
+   **Every outcome is caught** (§3.3) — a rejection here crashes the route
+   at runtime and, if reordered ahead of the guard, the build.
 2. `running`: `GET /api/tags` via `ollamaFetch(..., 2000)`; failure →
    `running: false`.
 3. `models`: `tags.models[]` → `{name, size, parameterSize}` only — exactly
-   what the picker shows and §6 matching needs (round 2: drop `installedAt`/
-   `quantization` — no consumer). `[]` when down.
+   what the picker shows and §6 matching needs. `[]` when down.
 4. `loaded`: `GET /api/ps` → names currently in memory; `[]` on failure.
 5. Every field has a fallback (`false` / `[]` / host string).
 
 ### 4.2 `POST /api/ollama/chat`
 
-- Guards (§3.2) → `readJsonBody` (1 MiB) → validate: `model` passes
-  `isValidTag` (lowercase); `messages` array ≤ 100 entries, each
-  `{role: user|assistant|system, content: string ≤ 32 000 chars}`.
-  Violation → `400 {error: "<plain-English reason>"}` **before** any
-  upstream call.
-- Ollama unreachable → `503 {error: "Ollama isn't running."}` — the UI
-  renders this as the "not running" notice, never as a fake reply.
+- Guards (§3.2) → `readJsonBody` → validate: `model` passes `isValidTag`;
+  `messages` array ≤ 100 entries, each `{role: user|assistant|system, content
+  : string ≤ 32 000 chars}` (the moved `ChatMessage.role` type **widens to
+  include `"system"`**). Violation → `400 {error: "<plain-English reason>"}`
+  before any upstream call.
+- Ollama unreachable → `503 {error: "Ollama isn't running."}` — rendered as
+  the "not running" notice, never as a fake reply.
 - Otherwise → passthrough per §3.4.
 
 ### 4.3 `POST /api/ollama/pull`
 
 - Same guards; `model` must pass `isValidTag`.
 - Passthrough per §3.4. Cancel = client aborts fetch (§3.5); Ollama finishes
-  or resumes the download on its own — the UI says so honestly (§8).
+  or resumes on its own — the UI says so honestly (§8).
 
 ### 4.4 Payload-caps philosophy
 
@@ -336,26 +361,27 @@ security boundary is loopback binding (§3.6) + Host/Origin guards (§3.2).
 
 ### 5.1 Sidebar — new "OLLAMA" section (directly below *Plugins*)
 
-**Space math:** desktop sidebar inner height ≈ 840 px @1440×900 and ≈ 708 px
-@1366×768; existing content ≈ 325 px closed / ≈ 515 px with AI History open.
-`.side` is a flex column with `overflow-y: auto` and `flex: none` children
-(`globals.css:162-175`) — so the section is **collapsed by default**: a
-header row (label + status pill) that expands on click. QA at **1440×768**
-specifically (§10.5).
+**Space math (restated after round 3):** sidebar inner height ≈ 840 px
+@1440×900 / ≈ 708 px @1366×768; existing content ≈ 325 px closed / ≈ 515 px
+with AI History open; the session-row list (§5.5) is **capped at
+`min(40vh, 300px)` with internal scroll**, so the open history block adds
+≤ ~300 px + meta — never the raw `20 × ~30 px` worst case. `.side` is a flex
+column with `overflow-y: auto`, `flex: none` children (`globals.css:162-175`)
+— the section is therefore **collapsed by default**: a header row (label +
+status pill) that expands on click. QA at **1440×768** with the pass
+criterion in §10.5.
 
 ```
 OLLAMA                              ● Connected      ← click to expand
 ┌──────────────────────────────────────────────┐
 │ not installed:                               │
-│   Install Ollama to chat with local models.  │
+│   Install Ollama to chat with local models…  │   ← full copy: §8
 │   [detected OS one-liner, selectable text]   │
 │   Other systems: macOS · Windows ▾           │
 │   Or download: ollama.com/download           │
 │   [Re-check]                                 │
 │ installed, unreachable:                      │
-│   Can't reach Ollama at 127.0.0.1:11434.     │
-│   Start it: <OS-specific command>            │
-│   (Set OLLAMA_HOST if it lives elsewhere.)    │
+│   Can't reach Ollama at <host>. …            │   ← full copy: §8
 │   [Re-check]                                 │
 │ running:                                     │
 │   2 local models on this machine             │
@@ -364,96 +390,94 @@ OLLAMA                              ● Connected      ← click to expand
 └──────────────────────────────────────────────┘
 ```
 
-**State ownership (round 2):** `ModelProvider` (§5.2) owns the **single**
-status fetch — on mount, every **5 s gated by `document.visibilitychange`**
-(no background polling), on `window` focus, and via `refresh()` (Re-check,
-after pulls). Each poll **aborts the previous in-flight request** and applies
-its result only if it is the latest (`pollId` guard) — a slow poll can never
-overwrite a fresh pill. `OllamaStatus` is **presentation-only**: it reads
-`status` from context and calls `refresh()`.
+**State ownership:** `ModelProvider` (§5.2) owns the **single** status fetch —
+on mount, every **5 s gated by `document.visibilitychange`**, on `window`
+focus, and via `refresh()` (Re-check, after pulls). Each poll **aborts the
+previous in-flight request** and applies its result only if latest (`pollId`
+guard) — a slow poll can never overwrite a fresh pill. `OllamaStatus` is
+**presentation-only**: reads `status` from context, calls `refresh()`.
 
-Pill → header word mapping (4 states, 4 words): `checking → "Checking…"`
-(grey), `down → "Not installed"` (`--bad`), `stopped → "Not running"`
-(`--y`), `up → "Connected"` (`--g`). Dot **+ text always** (not color-alone),
-`aria-live="polite"` on the status line.
+Pill → header word (4 states, 4 words): `checking → "Checking…"` (grey),
+`down → "Not installed"` (`--bad`), `stopped → "Not running"` (`--y`),
+`up → "Connected"` (`--g`). Dot **+ text always** (not color-alone),
+`aria-live="polite"`.
 
 Install commands: detected-OS-first via `navigator.userAgent` (client only);
-the other OSes are one click away; all commands selectable text (no copy
-buttons). Linux start copy: `ollama serve` in a terminal, or
-`sudo systemctl start ollama` (the official installer creates a **system**
-unit — `--user` would fail). macOS: `open -a Ollama`. Windows: start from the
-Start menu. Body copy matches the CLI's register (`client.rs:117`): always
-show the actual host, never hide it in a tooltip.
+other OSes one click away; selectable text (no copy buttons). Start copy per
+OS lives in §8. Body copy matches the CLI's register
+(`llama-cli/src/ollama/client.rs:114-119`): the actual host is always
+visible, never in a tooltip.
 
 ### 5.2 ModelProvider + AI Module (right panel) — this machine first
 
-- **`ModelProvider` (round 1 #12 + round 2 #12):** `components/
-  ModelProvider.tsx` with `"use client"` exporting context + hook;
-  `app/page.tsx` stays a server component and renders
-  `<ModelProvider>…children…</ModelProvider>`. Context value:
-  `{status, models, selected, setSelected, refresh, pulling, startPull,
-  cancelPull, sessions…}` — **all** fetching and pull state live here (a
-  module-scoped variable cannot re-render React). `AiModule`, `CenterChat`,
-  and `OllamaStatus` are consumers only.
-- **Dropdown = the real picker.** Options = `status.models` (installed
-  models only — the tree is the sole path to not-installed models), sorted by
-  name; each shows size + `loaded` badge; **pre-select the first** on load.
-  Button label = the selected tag (fallback "No model selected"); the
-  hardcoded `⚡ llama / llama / local` labels and the assistant-bubble name
-  `llama` are replaced by the real tag (§8).
-- **Model-switch rule:** if the current session has messages and a stream is
-  **not** in flight, picking another model shows an inline confirm in the row
-  ("Switch to llama3.2:latest? Your current chat stays as its own session.")
-  with Switch / Cancel. During a stream the picker is disabled (Stop first).
-  No messages → switch silently.
+- **One `ModelProvider`** (`components/ModelProvider.tsx`, `"use client"`)
+  exporting context + hooks; `app/page.tsx` stays a server component and
+  renders `<ModelProvider>…children…</ModelProvider>`. Full context value
+  (enumerated): `{status, hydrated, models, selected, setSelected, refresh,
+  pulling, startPull, cancelPull, sessions, setSessions, query, setQuery}`.
+  All fetching and pull state live here — a module-scoped variable cannot
+  re-render React.
+  **Re-render discipline (round 3 decision, §11.3):** the value is built with
+  `useMemo`, and a new `status` object is committed **only when it differs by
+  value** — a stable 5 s poll causes zero re-renders (no
+  CenterChat-with-100-messages churn every poll). A context split
+  (`StatusContext`/`ChatContext`) is *not* done up front — only if M2
+  profiling shows churn. `AiModule`, `CenterChat`, `OllamaStatus` consume via
+  `useOllama()` / `useChat()` hooks.
+- **Dropdown = the real picker.** Options = `status.models` (installed only —
+  the tree is the sole path to not-installed models), sorted by name; size +
+  `loaded` badge each; **pre-select the first** on load. Button label =
+  selected tag (fallback "No model selected"); the hardcoded
+  `⚡ llama / llama / local` labels and the bubble name `llama` are replaced
+  by the real tag (§8).
+- **Model-switch rule:** current session has messages **and no stream in
+  flight** → inline confirm in the row ("Switch to llama3.2:latest? Your
+  current chat stays as its own session.") with Switch / Cancel. During a
+  stream the picker is disabled (Stop first — §7 row 32). No messages →
+  silent switch. *Programmatic* switches (session restore, §5.5) never show
+  the confirm — the rule applies to user picks only.
 - **Tree gains install state** (via `ollamaTag`, §6):
-  - tag installed → `✓ installed` chip — for vision (`llama3.2-vision:*`)
-    and `llama4:*` guides the chip reads `✓ installed (text chat)` (the chat
-    has no image input; the plain `✓` would imply otherwise); clicking the
-    row **selects** it (guide link stays reachable via title/↗),
-  - tag not installed → **Pull** button (§5.4), disabled with reason when
-    Ollama is down,
-  - guide without a tag (Safety classifiers, LLaMA 1, …) → unchanged
-    guide-only link (never a dead button).
-- **`.desc` copy rewritten:** "Every model below runs on this machine through
-  ollama." → *"Browse the Llama family below. Models you've installed show ✓
-  and can be selected; the rest can be pulled in one click."*
+  - installed → `✓ installed` chip — `llama3.2-vision:*` and `llama4:*`
+    guides read `✓ installed (text chat)` (chat has no image input); clicking
+    the row **selects** it (guide link stays reachable via title/↗),
+  - not installed → **Pull** button (§5.4), disabled with reason when Ollama
+    is down,
+  - no tag (Safety classifiers, LLaMA 1, …) → unchanged guide-only link
+    (never a dead button).
+- **`.desc` copy rewritten:** *"Browse the Llama family below. Models you've
+  installed show ✓ and can be selected; the rest can be pulled in one click."*
 
 ### 5.3 Chat — real streaming (`components/CenterChat.tsx`)
 
-- `CANNED_REPLY` is deleted in **M1** (§9) and replaced by an honest
-  placeholder ("Chat lands next — pick a model to get ready.") so a green
-  pill never coexists with "no model is running" copy. M2 wires:
+- `CANNED_REPLY` is deleted in **M1** (§9), replaced by an honest placeholder
+  with the **input disabled** at M1 (§9) — a green pill never coexists with
+  "no model is running" copy. M2 wires:
   Send → `POST /api/ollama/chat` → if **`!response.ok`**, read JSON
-  `{error}` and enter the matching state (503 → "not running" notice) —
-  never open a stream reader on an error response. Otherwise read
-  `response.body` with a `ReadableStream` reader, decode via `new
-  TextDecoder()` (stream mode — handles chunks split mid-multibyte), buffer
-  across chunk boundaries, split on `\n`, `JSON.parse` each non-empty line
-  **inside try/catch** (a malformed line → row 29, not a crash):
+  `{error}` and enter the matching state — never open a stream reader on an
+  error response. Otherwise read `response.body` with a `ReadableStream`
+  reader, decode via `new TextDecoder()` (stream mode — handles chunks split
+  mid-multibyte), buffer across chunk boundaries, split on `\n`,
+  `JSON.parse` each non-empty line **inside try/catch** (malformed line →
+  row 29, not a crash):
   - `message.content` → append to the assistant bubble,
   - `error` → error state (§7),
-  - `done: true` → finish, persist session (M4).
+  - `done: true` → finish; persistence per §5.5 write points (M4).
 - **Double-submit guard:** while streaming, Send becomes **Stop**
   (AbortController) and Enter is ignored; empty/whitespace drafts never fire.
-- **Stop outcome:** keep whatever partial text arrived, mark the reply
-  "stopped" — **no** error line, **no** Retry (row 28).
+- **Stop outcome:** keep partial text, mark the reply "stopped" — no error
+  line, no Retry (row 28). **The session is still written** (§5.5).
 - **Warm-up line:** on send, if `selected ∉ status.loaded` → *"Warming up
-  `<model>` — the first reply takes a few seconds…"* until the first token;
-  refresh `loaded` when the stream ends.
+  `<model>` — the first reply takes a few seconds…"* until first token.
 - **State matrix rows** (inside the existing `.chat` frame):
-  1. `ollama down` → notice: "Ollama isn't running — start it from the
-     Ollama section in the sidebar." (**position-neutral**: at ≤620 px the
-     sidebar sits *below* the chat, `globals.css:660-665`); clicking the
-     notice expands + scrolls the Ollama section into view. Input disabled
-     with that placeholder.
-  2. `no models` → CTA "No models on this machine yet" + Pull-starter
-     (§6 defaults).
+  1. `ollama down` → notice: §8 "Chat down" copy (**position-neutral** — at
+     ≤620 px the sidebar sits *below* the chat, `globals.css:660-665`);
+     clicking the notice expands + scrolls the Ollama section into view.
+     Input disabled with that placeholder.
+  2. `no models` → CTA + Pull-starter (§6 defaults).
   3. `ready` → normal send.
   4. `stream error` → keep partial text, append honest error line, actions
-     **Retry** (resends last user message) / **Start new chat**; for
-     context-overflow errors offer only **Start new chat** (retrying the
-     identical payload fails again).
+     **Retry** / **Start new chat**; context-overflow → **Start new chat**
+     only (retrying the identical payload fails again).
 
 ### 5.4 Pull flow
 
@@ -461,23 +485,22 @@ show the actual host, never hide it in a tooltip.
 - **Preconditions:** Ollama running (else disabled: "Start Ollama first");
   `pullSize` exists (required on every tagged guide, §6).
 - **State lives in the provider:** `pulling: {tag, progress, status} | null`
-  — one pull at a time: all other Pull buttons disable ("Pulling…");
-  AiModule renders the progress row; CenterChat renders "A model is
-  downloading in the background." — all reactive because all read context.
+  — one pull at a time (others disable, "Pulling…"); AiModule renders the
+  progress row; CenterChat renders "A model is downloading in the
+  background." — all reactive through context.
 - **Confirm inline in the row:** name + size hint ("llama3.1:8b · about
   4.9 GB — downloaded once, then it's yours offline.") → Pull / Cancel.
-  **Over-30B extra line** (CLI coherence — the `llama` CLI only recommends
-  ≤30B): *"This one is huge (≈245 GB) — bigger than anything the llama CLI
-  recommends. Pull anyway / Cancel."*
-- **Progress:** keep `Map<digest, {total, completed}>` (last write wins per
-  digest); render `percent = Σcompleted / Σtotal × 100` + current `status`
-  text. Before `total` arrives (manifest phase): indeterminate bar with the
-  guide's `pullSize` as estimate.
-- **Success** → `refresh()` status, then **auto-select the new model only if
-  the chat is empty**; else "Ready — switch models from the picker." Row
-  flips to `✓ installed`.
-- **Error line** (`{"error"}` on HTTP 200) → red inline message; row returns
-  to Pull. **Transport drop mid-download** → row 31.
+  **>30B extra line** (trigger: `max(paramsBillions) > 30`; size
+  **interpolated from `pullSize`**, never a hardcoded literal): *"This one
+  is huge (≈{pullSize}) — bigger than anything the llama CLI recommends.
+  Pull anyway / Cancel."*
+- **Progress:** `Map<digest, {total, completed}>` (last write wins per
+  digest); `percent = Σcompleted / Σtotal × 100` + current `status` text.
+  Before `total` arrives: indeterminate bar with `pullSize` as estimate.
+- **Success** → `refresh()`, then **auto-select only if the chat is empty**;
+  else "Ready — switch models from the picker." Row flips to `✓ installed`.
+- **Error line** → red inline message; row returns to Pull.
+  **Transport drop** → row 31.
 - **Cancel** → abort fetch (§3.5); row → Pull + "Download stopped. Ollama
   may pick it back up next time."
 
@@ -485,50 +508,69 @@ show the actual host, never hide it in a tooltip.
 
 - Store in **`lib/history.ts`** (types move from `data/chat-sessions.ts`):
   `id, title, model, created_at, updated_at, messages[], message_count`;
-  `title` = first user message truncated to 60 chars; `updated_at` stamped
+  `title` = first user message **hard-cut** at 60 chars; `updated_at` stamped
   on every save; key `localStorage["las.sessions.v1"]`.
-- **Restore (round 1 #4 + round 2 #4):** on mount, read sessions **inside
-  `useEffect`** (never during render — a render-time `localStorage` read
-  breaks `next build`; initial state is empty so SSR/CSR match), then select
-  the most recent session into the chat.
-  - **Click target (new):** above the raw JSON, each session renders as a
+- **Restore:** on mount, read sessions **inside `useEffect`** (never during
+  render — render-time `localStorage` breaks `next build`; initial state
+  empty ⇒ SSR/CSR match), then select the most recent session into the chat.
+  - **Click target:** above the raw JSON, each session renders as a
     `.histrow` **button** (title · model · relative date) that loads that
-    session; the raw `<pre>` keeps its JSON look but shows **the currently
-    selected session's JSON** (the block the owner liked stays honest and
-    now meaningful).
-  - **New-chat control (new):** a `.histbtn`-styled "＋ New chat" button
-    under the `CHAT HISTORY` label (`aria-label="New chat"`) — clears
-    CenterChat's messages and starts a fresh unsaved session.
-- **Lifecycle rules:** first send after restore **appends** to the open
-  session (title/`created_at` frozen at session start; `updated_at` bumps);
-  restoring **drops any draft** without prompting; if the restored
-  `session.model` is no longer installed → load messages **read-only** with
-  row 18's notice; every appended message stamps
-  `at: new Date().toISOString()`.
-- **Hydration (round 2 #19):** until the mount read completes
-  (`hydrated === false`) the JSON block renders a neutral skeleton (`…`),
-  **not** the empty-state comment — a returning user must never see
-  "No chats yet" flash before their sessions load. Meta line:
-  "**N sessions** — stored in this browser" (the current "*N of M*"
-  denominator dies with the seed).
-- **Search:** `filterSessions(sessions, query)` — pure function moved to
-  `lib/history.ts`, no module-level storage access (unit-testable, §10.3).
-- **Multi-tab:** `storage` event → merge by session `id` comparing
-  **`updated_at`** (tie-break: greater `messages.length`, then lexicographic
-  id) — `created_at` alone is immutable and can't detect newer messages.
-  Merges only update local state (**never write back**) → no event loops.
-- **Guards:** corrupt JSON → reset to `[]` + welcome state; `QuotaExceededError`
-  → evict oldest sessions (floor 5) → else honest "Couldn't save this chat
-  (browser storage is full)." notice.
-- **Caps:** 20 sessions × 100 messages (evict oldest beyond 20; trim
-  messages beyond 100).
+    session; the `<pre>` keeps its JSON look but shows **the selected
+    session's JSON**. The list container is capped
+    (`max-height: min(40vh, 300px); overflow-y: auto` — new CSS) so 20
+    sessions can't blow the sidebar (§5.1 space math).
+  - **New-chat control:** `.histbtn`-styled "＋ New chat" under the
+    `CHAT HISTORY` label (`aria-label="New chat"`) — clears CenterChat's
+    messages, starts a fresh unsaved session.
+  - **Mid-stream guard (round 3):** while a stream is in flight, `.histrow`
+    buttons and `＋ New chat` are `aria-disabled` with visible reason
+    *"Stop the reply first"* (same rule as the picker, row 32) — otherwise
+    tokens would land in the swapped-in session. Row 38.
+- **Search (specified, round 3):** the search input filters the **`.histrow`
+  list** (case-insensitive, via pure `filterSessions(sessions, query)` in
+  `lib/history.ts`); the raw `<pre>` is **not** search-scoped — it always
+  renders the selected session's JSON. Typing still **auto-opens** the
+  collapsed history (preserves `Sidebar.tsx:47`). Meta line: normally
+  *"N sessions — stored in this browser"*; while a query is active
+  *"N of M sessions matching \"q\""*; zero results → the `<pre>` shows
+  `// No sessions match "q".` (§8).
+- **Model on restore (round 3):** if `session.model` is installed →
+  `setSelected(session.model)` **silently** (programmatic; §5.2's confirm is
+  for user picks only); if not installed → keep current selection, load
+  messages **read-only** with row 18's notice, input disabled until a model
+  is chosen (row 36). **Every send stamps `session.model = selected`** — the
+  JSON never claims a model that didn't answer.
+- **Write points (round 3 — never write only on `done`):**
+  (a) first send → create session (title from first user message,
+  `created_at`/`title` frozen, `model = selected`);
+  (b) every appended message → stamp `at: new Date().toISOString()`, bump
+  `updated_at`;
+  (c) stream end of **any** kind — `done`, Stop, or error → write the
+  session. A Stop or crashed stream survives reload (row 35).
+- **Lifecycle:** first send after restore **appends** to the open session
+  (row 34); restoring **drops any draft** without prompting.
+- **Hydration:** until the mount read completes (`hydrated === false`) both
+  the `<pre>` **and the meta line** render a neutral skeleton (`…`) — never a
+  "No chats yet" / "0 sessions" flash (row 37).
+- **Multi-tab:** `storage` event → union by session `id`, newer `updated_at`
+  wins (tie-break: greater `messages.length`, then lexicographic id); merges
+  only update local state (**never write back** → no loops). **Caps are
+  re-applied on every local save** (evict oldest >20) so an eviction done in
+  another tab doesn't resurrect; removals are not back-propagated — a
+  documented limitation of the no-write-back rule.
+- **Guards:** corrupt JSON → reset to `[]` + welcome state;
+  `QuotaExceededError` → evict oldest sessions (floor 5) → else honest
+  *"Couldn't save this chat (browser storage is full)."* notice.
+- **Caps:** 20 sessions; per session 100 messages (**oldest dropped** beyond
+  100).
 - **Empty state:** `// No chats yet — messages you send are saved in this
   browser only.` above `[]`.
 - **Selection persistence:** `localStorage["las.selected.v1"]`, restored on
-  mount, shared across tabs (§7 row 19 reads it via the `storage` event).
-- **Delete** `data/chat-sessions.ts`; `Sidebar.tsx` (its only importer —
-  verified) switches to the store. **`filterSessions` moves wholesale** — no
-  dead copies.
+  mount, shared across tabs via the `storage` event (row 19).
+- **Delete** `data/chat-sessions.ts` **at M4**; until then the seed stays and
+  is explicitly a placeholder (§9 M1 note) — `Sidebar.tsx` (its only
+  importer) switches to the store at M4. `filterSessions` moves wholesale —
+  no dead copies.
 
 ---
 
@@ -542,18 +584,20 @@ export interface ModelGuide {
   /** Exact `ollama pull` tag when this guide maps to a registry model. */
   ollamaTag?: string;   // e.g. llama-3-1-8b → "llama3.1:8b"
   /** Pull-size hint for the confirm step ("~4.9 GB"). Required when
-      ollamaTag is set — enforced by the §10.3 test. */
+      ollamaTag is set — asserted by the §10.3 value table. */
   pullSize?: string;
-  /** Nominal parameter counts (billions) this guide covers — the matching
-      rule in §6 compares installed details.parameter_size against these
-      (±25%, per catalog_entry_for). Required when ollamaTag is set. */
+  /** Nominal parameter counts (billions) this guide covers — §6's matching
+      rule compares installed parameter_size against these (±25%, per
+      catalog_entry_for). Required when ollamaTag is set. */
   paramsBillions?: number[];
 }
 ```
 
-Mapping for the 19 guides — tags confirmed present in the registry
-(round 2); sizes are Σ registry manifest layers (capture: Oct 2026,
-`TAG_SIZES`-style table asserted by the §10.3 test):
+Mapping for the 19 guides — tags confirmed in the registry (round 2); sizes
+are Σ registry manifest layers; **parse rule** for installed
+`parameter_size` strings: take the leading `[0-9.]` run, `parseFloat`
+(`"8.0B"` → 8.0, `"109B"` → 109 — port of `catalog.rs:186-195`; live-verified
+on this machine). Capture: Oct 2026 (asserted, §10.3):
 
 | Guide | tag | pullSize | params | | Guide | tag | pullSize | params |
 |---|---|---|---|---|---|---|---|---|
@@ -569,33 +613,39 @@ Mapping for the 19 guides — tags confirmed present in the registry
 *(no tag — guide only): llama-1-6-7b-13b, safety-classifiers, llama-1-33b-65b,
 llama-4-behemoth.*
 
-**Vision tags are `llama3.2-vision:<size>`** — `llama3.2:11b-vision` /
-`llama3.2:90b-vision` do not exist. Note: `ollama.com/library/llama4` now
-*displays* `llama4:16x17b` / `llama4:128x17b` while `llama4:scout|maverick`
-still resolve (200) — existence checks use the API, not the display names.
+Notes: **vision tags are `llama3.2-vision:<size>`** (`llama3.2:11b-vision`
+doesn't exist). `paramsBillions` for the 5 tags overlapping `catalog.rs`
+(1B/3B/7B/8B/11B/13B) come from the CLI catalog; the other 10 from published
+model specs (registry manifests carry no `parameter_size` — provenance
+recorded in §10.3's assertion table). `ollama.com/library/llama4` now
+*displays* `llama4:16x17b`/`llama4:128x17b` while `llama4:scout|maverick`
+still resolve — existence checks use the API, not display names.
 
 **Installed-matching rule — an *adaptation* of `catalog_entry_for`
-(`catalog.rs:206-236`), family constraint included (round 2 #3):**
+(`catalog.rs:206-229`), family constraint included:**
 
 1. **Exact tag:** `/api/tags[].name === ollamaTag` → installed.
-2. **Same base name + params:** let `base(name)` = text before `:` in the
-   model name. A guide matches iff `base(installed) === base(ollamaTag)`
-   **and** `details.parameter_size` (parsed to billions) is within **±25 %**
-   of **any** value in the guide's `paramsBillions`. Multiple matches →
-   badge all (honest); no matches → no badge.
+2. **Same base name + params:** `base(name)` = text before `:`. A guide
+   matches iff `base(installed) === base(ollamaTag)` **and**
+   `parameter_size` (parsed as above) is within **±25 %** of **any** value
+   in the guide's `paramsBillions`. Multiple matches → badge all; none → no
+   badge.
 3. Guides without `ollamaTag` never badge.
 
-Consequences (the §10.3 expected-results table): `llama3.2:latest` (3.2B)
-→ badges the 1B–3B guide only; `llama3.1:8b` → exact, 8B guide;
-`llama3.1:405b` → 405B guide only; `llama3.1:70b` (>30B) must **not** badge
-the 8B guide; `mistral:7b` / `qwen2.5:7b` → **no badge** (base-name mismatch
-— this is the family constraint the CLI's test asserts, `catalog.rs:417-430`);
-`llama3.2-vision:latest` → vision guide, never the text guide.
-"Over-30B rejection" in §10.3 means exactly the `llama3.1:70b` row above.
+Expected results (§10.3's asserted table, independently re-derived in round
+3): `llama3.2:latest` (3.2B) → 1B–3B guide only; `llama3.1:8b` → 8B guide
+(exact); `llama3.1:405b` → 405B guide; `llama3.1:70b` → 70B guide and
+**must not** badge the 8B guide (family ✓, ±25 % ✗) — note the plan does
+*not* enforce the CLI's ≤30B catalog policy: installed >30B guides badge
+their own guide, and the §10.3 case asserts only the negative;
+`mistral:7b`/`qwen2.5:7b` → **no badge** (base-name mismatch — the CLI's
+own test uses `qwen2.5:7b`, `catalog.rs:417-430`); `llama3.2-vision:latest`
+→ vision guide only; `llama2:13b` → 7b-13b guide; `codellama:70b` →
+34b-70b guide; `llama4:scout` → scout guide.
 
-**Starter default:** the no-models CTA offers `DEFAULT_TAG = "llama3.1:8b"`
-("the default pick — about 4.9 GB"), with a secondary link to `llama3.2:3b`
-("about 2 GB, if you're short on RAM") — matching `catalog.rs:162`.
+**Starter default:** no-models CTA offers `DEFAULT_TAG = "llama3.1:8b"`
+("the default pick — about 4.9 GB"); secondary link copy is the §8 row
+("Prefer smaller? llama3.2:3b (about 2 GB).") — one wording, §8 wins.
 
 **Persistence:** `localStorage` only — versioned keys (`las.sessions.v1`,
 `las.selected.v1`), no server DB.
@@ -606,12 +656,12 @@ the 8B guide; `mistral:7b` / `qwen2.5:7b` → **no badge** (base-name mismatch
 
 | # | Condition | Detect | UI | Milestone |
 |---|---|---|---|---|
-| 1 | Ollama not installed | `execFile` + fallbacks fail | Install guide + Re-check | M1 |
-| 2 | Installed, can't reach (not running **or** wrong `OLLAMA_HOST` — indistinguishable) | `installed && ping failed` | "Can't reach Ollama at `<host>`. Start it with `ollama serve` — or set OLLAMA_HOST if it lives elsewhere." (host always visible; voice matches `client.rs:117`) | M1 |
+| 1 | Ollama not installed | `execFile` + fallbacks fail (`OLLAMA_BIN_PATHS=` for QA) | Install guide + Re-check | M1 |
+| 2 | Installed, can't reach (not running **or** wrong `OLLAMA_HOST` — indistinguishable) | `installed && ping failed` | §8 "Can't-reach body" (OS-specific command; **host always visible** — this row's cell defers to §8, which is normative) | M1 |
 | 2b | Installed but not on PATH | `onPath: false` | "Ollama is installed but not on your PATH — the status check used its default location." | M1 |
 | 3 | Running, 0 models | tags `[]` | Picker empty state (M1); Pull-starter CTA (M3) | M1/M3 |
 | 4 | Running, models | tags list | Pre-select first; tree badges (M3) | M1 |
-| 5 | Status down mid-session | 5 s poll / focus | Pill red; input disables with notice | M1 |
+| 5 | Status down mid-session | 5 s poll / focus | Pill → "Not running" (`--y`; `--bad` only if the binary disappears too); input disables with the row-1 notice | M1 |
 | 6 | Status back up | same | Pill green; input re-enables; selection kept if still installed | M1 |
 | 7 | Chat while down | 503 from handler | Inline notice + disabled input | M2 |
 | 8 | Slow first token | not in `loaded[]` at send | "Warming up …" line | M2 |
@@ -625,46 +675,63 @@ the 8B guide; `mistral:7b` / `qwen2.5:7b` → **no badge** (base-name mismatch
 | 16 | Chat while pulling | — | Allowed; background-download note | M3 |
 | 17 | Second pull attempted | provider `pulling` flag | Other Pull buttons disabled ("Pulling…") | M3 |
 | 18 | Selected model deleted externally | poll: name gone | Clear selection + "was removed — pick another model" | M1 |
-| 19 | Two tabs | `storage` event | Merge by `updated_at`, no write-back; selection shared via `las.selected.v1` | M4 |
+| 19 | Two tabs | `storage` event | Union by `updated_at`, no write-back, caps re-applied on save; selection shared | M4 |
 | 20 | localStorage corrupt | JSON.parse throws | Reset + welcome state | M4 |
 | 21 | localStorage full | QuotaExceededError | Evict oldest (floor 5) → honest notice | M4 |
 | 22 | Wrong OLLAMA_HOST | — | Folded into row 2 | — |
 | 23 | Very long response | — | Internal scroll + auto-scroll (existing) | M2 |
 | 24 | Non-ASCII/emoji streaming | TextDecoder stream mode | Renders correctly | M2 |
 | 25 | Empty/whitespace draft | client guard | Send does nothing | M2 |
-| 26 | First-ever visit (no Ollama, no history) | both empty | Install section + welcome + CTA, no overlap | M1 (M4 for welcome) |
+| 26 | First-ever visit (no Ollama, no history) | both empty | Install section + welcome + CTA, no overlap | M1 (welcome leg: M4) |
 | 27 | Guide with no tag clicked | no `ollamaTag` | Guide link only — no chip, no Pull | M3 |
-| 28 | **Stop pressed** | AbortController | Keep partial text, mark "stopped" — no error line, no Retry | M2 |
-| 29 | **Malformed NDJSON line** | JSON.parse throws in try/catch | Skip line, log once; if it kills the stream → row 10 | M2 |
-| 30 | **Chat payload > 1 MiB** | 413 from handler | "This chat is too long to send — start a new chat." | M2 |
-| 31 | **Pull stream transport drop** | reader error | "Connection lost mid-download — Ollama will finish it next time you pull." | M3 |
-| 32 | **Model-switch confirm while streaming** | stream active | Picker disabled until Stop/finish | M2 |
-| 33 | **Status still `checking` on first paint** | `status === "checking"` | Send disabled with placeholder "Checking Ollama…" until resolved | M1 |
+| 28 | Stop pressed | AbortController | Keep partial text, mark "stopped" — no error line, no Retry; session still written (row 35) | M2 |
+| 29 | Malformed NDJSON line | JSON.parse throws in try/catch | Skip line, log once; if it kills the stream → row 10 | M2 |
+| 30 | Chat payload > 1 MiB | 413 from handler | "This chat is too long to send — start a new chat." | M2 |
+| 31 | Pull stream transport drop | reader error | "Connection lost mid-download — Ollama will finish it next time you pull." | M3 |
+| 32 | Model-switch confirm while streaming | stream active | Picker disabled until Stop/finish | M2 |
+| 33 | Status still `checking` on first paint | `status === "checking"` | Send disabled, placeholder "Checking Ollama…" | M1 |
+| 34 | First send after restore | restored session open | Appends to it; `created_at`/`title` frozen; `model` stamped | M4 |
+| 35 | Stop/error reply must survive reload | write points §5.5(c) | Session written on any stream end | M4 |
+| 36 | Restore with uninstalled model | `session.model ∉ models` | Read-only messages + row-18 notice, input disabled until a model is picked | M4 |
+| 37 | Hydration | `hydrated === false` | Skeleton in `<pre>` **and meta** — no "No chats yet"/"0 sessions" flash | M4 |
+| 38 | Stream active + session row / `＋ New chat` clicked | stream state | `aria-disabled` + "Stop the reply first" | M2 |
 
 ---
 
-## 8. Copy contract (before → after; plain English)
+## 8. Copy contract (normative — §8 wins wherever §5.1's sketch or §7's
+paraphrase differ; strings quoted in §5.x but absent here are normative as
+quoted)
 
-| Where | ❌ Current / round-1 draft | ✅ This draft |
+| Where (exact) | ❌ Current | ✅ Shipped |
 |---|---|---|
 | `.desc` (tree) | "Every model below runs on this machine through ollama." | "Browse the Llama family below. Models you've installed show ✓ and can be selected; the rest can be pulled in one click." |
-| Chat header/starter (CenterChat.tsx:39,56,88) | "Chat with local models via ollama" / "served by ollama" | "Chat with local models" / "…streamed live from Ollama on your machine." (**Ollama** capitalized everywhere — §10.4 positive check) |
-| Picker button + options (AiModule.tsx:55-69) | hardcoded `⚡ llama` / `llama` / `local` | button = selected tag (e.g. `llama3.1:8b`); fallback "No model selected"; options = real tags |
-| Assistant bubble name (CenterChat.tsx:66) | `llama` | the selected tag |
-| Chat empty state (after M1) | canned reply | "Chat lands next — pick a model to get ready." (M1) → "Pick a model and say hi — replies stream live from your machine." (M2) |
-| Chat down | "no model is running" | "Ollama isn't running — start it from the Ollama section in the sidebar." (click → expands + scrolls to it; **position-neutral**: sidebar is *below* chat at ≤620 px) |
-| Status checking | — | "Checking…" (4th pill word — header never has fewer words than pill states) |
-| Not installed body | "Install Ollama, then reload this page." | "Install Ollama to chat with local models — it's free and runs on your machine. Install it, then press Re-check." |
-| Can't-reach body | "Start it: ollama serve" | "Can't reach Ollama at `127.0.0.1:11434`. Start it: `open -a Ollama` (macOS) / `ollama serve` (Linux/Windows) — or set OLLAMA_HOST if it lives elsewhere." (Linux systemd: `sudo systemctl start ollama`, **not** `--user`) |
+| `layout.tsx:18` metadata | "Chat with local models via ollama — …" | Same sentence with **Ollama** capitalized (full metadata line updated at M4) |
+| `CenterChat.tsx:39` header | "Chat with local models via ollama" | "Chat with local models" |
+| `CenterChat.tsx:55-57` `.empty` paragraph | "…this reply would stream…" (canned) + "the dropdown on the right" | M1: "Chat lands next — pick a model to get ready." M2: "Pick a model and say hi — replies stream live from your machine." |
+| `CenterChat.tsx:53` `.empty` heading | "No messages yet" | **Kept** (true at both milestones) |
+| `CenterChat.tsx:88` input hint | "…installed yourself with ollama." (line 89 after edits — verify at build) | "…installed yourself with Ollama." |
+| `CenterChat.tsx:56`/down state | "no model is running" | "Ollama isn't running — start it from the Ollama section in the sidebar." (click → expands + scrolls; position-neutral: sidebar is *below* chat ≤620 px) |
+| Picker button + options (`AiModule.tsx:55-69`) | hardcoded `⚡ llama` / `llama` / `local` | button = selected tag; fallback "No model selected"; options = real tags |
+| Assistant bubble name (`CenterChat.tsx:66`) | `llama` | the selected tag |
+| Status header | — | 4 words for 4 pill states: "Checking…" / "Not installed" / "Not running" / "Connected" (dot + word always) |
+| Not-installed body | "Install Ollama, then reload this page." | "Install Ollama to chat with local models — it's free and runs on your machine. Install it, then press Re-check." |
+| Can't-reach body | "Start it: ollama serve" | "Can't reach Ollama at `127.0.0.1:11434`. Start it: `open -a Ollama` (macOS) / `ollama serve` (Linux & Windows) — or set OLLAMA_HOST if it lives elsewhere." (Linux systemd alternative: `sudo systemctl start ollama`, **not** `--user`) |
 | Pull confirm | "≈4.9 GB download" | "llama3.1:8b · about 4.9 GB — downloaded once, then it's yours offline." |
-| Pull confirm (>30B) | (none) | "This one is huge (≈245 GB) — bigger than anything the llama CLI recommends. Pull anyway / Cancel." |
+| Pull confirm (>30B) | hardcoded `≈245 GB` | "This one is huge (≈{pullSize}) — bigger than anything the llama CLI recommends. Pull anyway / Cancel." (size interpolated; trigger `max(paramsBillions) > 30`) |
 | Pull cancel | "partial download resumes later" | "Download stopped. Ollama may pick it back up next time." |
 | Warm-up | "Warming up <model>…" | "Warming up llama3.1:8b — the first reply takes a few seconds." |
-| History meta | "N of M sessions" | "**N sessions** — stored in this browser" |
-| History empty | bare `[]` | `// No chats yet — messages you send are saved in this browser only.` above `[]`; skeleton (`…`) until hydrated |
+| History meta (normal) | "N of M sessions" | "**N sessions** — stored in this browser" |
+| History meta (query active) | "N of M … matching" + "— raw JSON" | "**N of M** sessions matching \"q\"" |
+| History empty | bare `[]` | `// No chats yet — messages you send are saved in this browser only.` above `[]`; `// No sessions match "q".` on zero results; skeleton until hydrated |
 | Context overflow | "Retry" | "This chat is too long for the model's memory. Start a new chat." + button |
 | Payload >1 MiB | (none) | "This chat is too long to send — start a new chat." |
 | No-models CTA | "Pull a starter model (llama3.2:3b)" | "No models yet — get the default pick: llama3.1:8b (about 4.9 GB). Prefer smaller? llama3.2:3b (about 2 GB)." |
+
+Also normative as quoted elsewhere in this plan: `Switch / Cancel` (§5.2),
+"Pulling…" (§5.4), "jump to picker" (§5.1), "Stop the reply first" (§5.5),
+"Couldn't save this chat (browser storage is full)." (§5.5), the read-only
+restore notice (§5.5 + row 36), "A model is downloading in the background."
+(§5.4).
 
 Voice check at M4: the section must read like `llama`'s guided recommender
 (same defaults — `DEFAULT_TAG`, same plain-English register).
@@ -676,35 +743,50 @@ Voice check at M4: the section must read like `llama`'s guided recommender
 - **M1 — Status + local models + honest chat placeholder.** `lib/ollama.ts`
   (guards included), all three route handlers, `OllamaStatus` sidebar
   section (collapsed, live, detected-OS install guide), `ModelProvider`
-  (status ownership + selection), real dropdown (installed models only).
-  **`CANNED_REPLY` is deleted here** — CenterChat shows the M1 placeholder
-  so a green pill never coexists with "no model is running" (round 2 #14).
-  *Done when:* pill flips correctly with `ollama serve` killed/restarted
-  without a rebuild; dropdown shows `llama3.1:8b` + `llama3.2:latest` with
-  sizes; install guide visible when down; abort wiring verified via the
-  §10.2.5 curl abort (no runaway generation — the Stop **button** is M2).
+  (status ownership + selection + hydrated flag), real dropdown (installed
+  only). **`CANNED_REPLY` deleted here**; CenterChat shows the M1
+  placeholder with the **input disabled** (placeholder = the §8 M1 sentence)
+  — a green pill never coexists with "no model is running". The seed history
+  remains in the sidebar until M4 — an explicit placeholder, **not** a
+  persistence claim (row 26's "no history" leg is M4-only).
+  *Done when:* pill flips with `ollama serve` killed/restarted without a
+  rebuild; dropdown shows `llama3.1:8b` + `llama3.2:latest` with sizes;
+  install guide visible when down; input disabled with the M1 placeholder;
+  abort wiring verified via §10.2.5 curl abort (no runaway generation — the
+  Stop **button** is M2).
 - **M2 — Real chat.** Streaming pipeline (`response.ok` branch, split-safe
   line buffer, parse try/catch), state matrix rows 5–12, 23–25, 28–30, 32,
-  Stop, warm-up, double-submit guard, model-switch confirm. Sessions remain
-  **in-memory** (no persistence claim anywhere in M2 copy).
-  *Done when:* tokens stream, Stop leaves a "stopped" reply with no error
-  line, killing Ollama mid-conversation shows the honest notice, forbidden
-  strings (§10.4 list B) are gone from source.
+  33, 38, Stop, warm-up, double-submit guard, model-switch confirm,
+  mid-stream guards on history controls. Sessions remain **in-memory** (no
+  persistence claim in M2 copy). *Done when:* tokens stream, Stop leaves a
+  "stopped" reply with no error line, killing Ollama mid-conversation shows
+  the honest notice, §10.4 List B is green in source.
 - **M3 — Pull.** `ollamaTag` + `pullSize` + `paramsBillions` on all 15
   tagged guides, installed matching (§6 rules 1–3), tree chips (`(text
   chat)` variants), provider-owned one-at-a-time pull with aggregated
-  progress, auto-select-if-empty, starter CTA, `.desc` rewrite, copy rows
-  for picker/bubble. *Done when:* pulling `llama3.2:1b` end-to-end shows
-  progress → appears installed → chat answers; a bad tag errors inline;
-  this machine's `llama3.2:latest` badges the 1B–3B guide; `mistral:7b`
-  badges nothing (§10.3 table).
-- **M4 — Real history + polish + docs + full QA.** `lib/history.ts`
-  (mount-only reads, session rows + raw JSON of current session, New-chat
-  control, restore-latest, lifecycle rules, hydration skeleton, multi-tab
-  merge, quota guards, caps, `las.selected.v1`), seed deleted, full copy
-  table (§8), README + **`package.json` `start` script** updated (loopback
-  bind, stale route count fixed, "static/canned" claims removed), vitest
-  suite green, full §10 gate + committed screenshot references.
+  progress, auto-select-if-empty, starter CTA, `.desc` rewrite, picker/bubble
+  copy rows. *Done when:* pulling `llama3.2:1b` end-to-end shows progress →
+  appears installed → chat answers; a validly-shaped nonexistent tag
+  (`no-such-model:1b`) errors inline; `llama3.2:latest` badges the 1B–3B
+  guide; `mistral:7b` badges nothing (§10.3 table).
+- **M4 — Real history + polish + docs + CI + full QA.**
+  `lib/history.ts` (mount-only reads, session rows + raw JSON of current
+  session, `＋ New chat`, restore-latest, search spec, model-on-restore rule,
+  write points, hydration skeleton, multi-tab merge, quota guards, caps,
+  `las.selected.v1`), seed deleted, full copy table (§8), vitest suite
+  green, and the doc/CI drift list — **exactly these six:**
+  1. `crates/web/README.md`: remove "fully static / canned" claims; add
+     `/api/ollama/*` routes to the route table (post-M1 count: **25 route
+     entries + 3 API = 28** in the printed table, manifests per §10.1);
+     `pnpm dev # http://localhost:3000` → `http://127.0.0.1:3000`; layout
+     tree gains `lib/`, drops `data/chat-sessions.ts`; CI line becomes
+     lint + test + build;
+  2. `package.json`: `"start": "next start -H 127.0.0.1"`;
+  3. `.github/workflows/ci.yml`: web job gains `pnpm test` between Lint and
+     Build (job name may become `web (lint + test + build)`);
+  4. root `README.md`: only if the web commands changed;
+  5. `.gitignore`: nothing (verify `qa/baselines/` is **not** ignored);
+  6. `qa/baselines/` + `qa/README.md` captured (§10.6).
   *Done when:* every §8 row is the shipped copy; §10 checklist signed off.
 
 Deferred (explicitly out of scope): model deletion, `llama catalog --json`
@@ -719,120 +801,145 @@ product decision).
 ### 10.1 Build & lint
 1. `pnpm lint` clean; `pnpm build` exits 0 with **no** `Error occurred
    prerendering` / `dynamic-server-error` lines. `next build
-   --debug-prerender` is a *separate diagnostic build* (it disables
-   minification and must not be deployed): run it when investigating, then
-   rebuild clean; route handlers never run instant validation, so API routes
-   can't affect its output.
-2. **Route accounting (named artifacts, round 2 #1):**
-   - `.next/prerender-manifest.json` → `routes` has **24** entries today and
-     must **stay exactly 24** after M1 — the 3 API routes must never be
-     prerendered (this is the executable form of §3.3's assertion),
-   - `.next/app-path-routes-manifest.json` → **6** entries today → **9**
-     after M1 (3 API routes),
-   - proxy counted separately from `.next/functions-config-manifest.json`.
+   --debug-prerender` is a **diagnostic** build (disables minification,
+   enables server source maps, `prerenderEarlyExit=false` for *any* prerender
+   error — including a throwing GET route handler; never deploy its output):
+   use it when §3.3-type build failures are investigated, then rebuild clean.
+   (`instant` validation covers layout/page segments only — route handlers
+   are unaffected by it either way.)
+2. **Route accounting (named artifacts + commands):**
+   - `node -e 'console.log(Object.keys(require("./.next/prerender-manifest.json").routes).length)'`
+     → **24** today, **must stay 24** after M1 (API routes must never
+     prerender — the executable form of §3.3);
+   - `node -e 'console.log(Object.keys(require("./.next/app-path-routes-manifest.json")).length)'`
+     → **6** today → **9** after M1 (3 API routes);
+   - `.next/server/functions-config-manifest.json` (note: under `server/`)
+     → stays exactly **1** entry, `/_middleware` (the proxy).
 
 ### 10.2 Backend smoke (curl, against `http://127.0.0.1:<port>`)
 1. Status: live flips with `ollama serve` killed/restarted (no rebuild);
-   `OLLAMA_HOST=http://127.0.0.1:1` override → honest "can't reach" (row 2).
-   `.next/prerender-manifest.json` contains no `/api/*` entries.
-2. Chat: `curl -N -X POST …/api/ollama/chat` streams NDJSON; measure
-   time-to-first-byte (expected fast — `no-transform` already excludes gzip,
-   §3.4). If > ~200 ms, suspect Ollama TTFB, then consider server-wide
-   `compress: false` as fallback.
-3. Pull: `llama3.2:1b` end-to-end; bad tag → `{"error"}` line.
+   `OLLAMA_HOST=http://127.0.0.1:1` → row 2's honest "can't reach";
+   `OLLAMA_BIN_PATHS=` → row 1. Prerender manifest still has no `/api/*`.
+2. Chat (note the mandatory header — without it the guard correctly 400s):
+   `curl -N -i -X POST -H 'Content-Type: application/json' \
+    -d '{"model":"llama3.1:8b","messages":[{"role":"user","content":"hi"}]}' \
+    http://127.0.0.1:<port>/api/ollama/chat` streams NDJSON; measure
+   time-to-first-byte (`no-transform` already excludes gzip — if > ~200 ms,
+   suspect Ollama TTFB, then consider server-wide `compress: false`).
+3. Pull: `llama3.2:1b` end-to-end; **validly-shaped nonexistent tag**
+   `no-such-model:1b` → `{"error"}` line (regex-level rejections —
+   `../../etc`, uppercase — are already covered by the 400 in step 4).
 4. Guards: foreign `Origin` → 403; `Origin: null` → 403; foreign `Host`
-   (rebinding-style) → 403 **on GET and POST**; non-JSON content-type → 400;
-   2 MiB body → 413; tag `../../etc` or uppercase `llama3:8B` → 400;
-   Origin-absent curl → accepted.
-5. Abort: client abort mid-stream → generation stops (`ollama ps` idles
-   within its unload window), server log has no unhandled rejection.
+   (rebinding-style, e.g. `-H 'Host: evil.test'`) → 403 **on GET and POST**;
+   non-JSON content-type → 400; 2 MiB body → 413 (curl may exit 18
+   `transfer closed with outstanding read data` — judge by the status line,
+   not the exit code); Origin-absent curl → accepted.
+5. Abort: `curl -N … &` then kill it mid-stream → generation stops
+   (`ollama ps` idles within the unload window), server log has no
+   unhandled rejection.
 
 ### 10.3 Unit tests (vitest)
-`vitest` devDependency + `"test": "vitest run"`; CI gains a **Test** step
-between Lint and Build. Pure functions only — no e2e runner (the manual
-matrix in §10.5 covers integration; proportionate for a never-in-production
-tool):
-- `isValidTag`: accept/reject table — `../../etc`, uppercase `llama3:8B`,
-  empty, overlong, valid mixed-case suffixes are **rejected** (lowercase
-  rule).
+`vitest` devDependency + `"test": "vitest run"`; `vitest.config.ts` must map
+the `@/` alias (same as `tsconfig.json`); CI gains a **Test** step between
+Lint and Build. Pure functions only — no e2e runner (§10.5's manual matrix
+covers integration; proportionate for a never-in-production tool). **Per
+milestone:** M1 → `isValidTag`; M2 → NDJSON line buffer; M3 →
+`matchInstalled` + data integrity; M4 → `filterSessions` + history prune.
+
+- `isValidTag`: accept/reject table — `../../etc` ✗, `llama3:8B` ✗
+  (lowercase rule), empty ✗, overlong ✗, `no-such-model:1b` ✓ (shape-valid;
+  existence is Ollama's job).
 - NDJSON line buffer: chunk splits mid-line, mid-multibyte char, CRLF, blank
   lines, `{error}` line, `done` line, malformed line (row 29).
 - `filterSessions(sessions, query)` — pure search behavior.
-- `matchInstalled(tags, guides)` — **expected-results table** (§6):
-  `llama3.2:latest` → 1B–3B guide only; `llama3.1:8b` → 8B guide (exact);
-  `llama3.1:405b` → 405B guide only; `llama3.1:70b` must not badge the 8B
-  guide; `mistral:7b`/`qwen2.5:7b` → none; `llama3.2-vision:latest` →
-  vision guide only; `llama4:scout` → scout guide.
+- `matchInstalled(tags, guides)` — **fixture inputs given** (round 3):
+  `llama3.2:latest`→`"3.2B"` ⇒ 1B–3B guide only; `llama3.1:8b`→`"8.0B"` ⇒
+  8B guide (exact); `llama3.1:70b`→`"70B"` ⇒ 70B guide, **not** the 8B
+  guide; `llama3.1:405b`→`"405B"` ⇒ 405B guide; `mistral:7b`→`"7.6B"` ⇒
+  none; `qwen2.5:7b`→`"7.6B"` ⇒ none; `llama3.2-vision:latest`→`"10.7B"` ⇒
+  vision guide only (rule 2 — a 3.2B fixture would wrongly fail);
+  `llama2:13b`→`"13B"` ⇒ 7b-13b guide; `codellama:70b`→`"70B"` ⇒ 34b-70b
+  guide; `llama4:scout`→`"109B"` ⇒ scout guide.
 - Data integrity: every `ollamaTag` guide has `pullSize` **and**
   `paramsBillions`; no duplicate tags; **pullSize value table asserted**
-  (the §6 sizes with their Oct-2026 capture note — this is the mechanism
-  round 2 asked for instead of the "locked" claim).
-- History prune: 21 sessions → 20; 101 messages → 100.
+  (§6's sizes + Oct-2026 capture note; provenance: registry manifests for
+  sizes, `catalog.rs` + published model specs for `paramsBillions` — this is
+  the locking mechanism round 2 demanded).
+- History prune: 21 sessions → 20 (oldest evicted); 101 messages → 100
+  (oldest dropped).
 
-### 10.4 Forbidden-string sweep (scoped, round 2 #6)
-- **List B (source, `app/ components/ data/ lib/ *.json *.yaml`, excluding
-  this plan):** `CANNED_REPLY|canned|UI-only demo|demo nonsense|no
-  backend|TODO|FIXME` — zero matches after M2 (README part after M4). Also a
-  **positive check**: `Ollama` is capitalized in all user-facing copy (a
-  grep for lowercase `ollama` in JSX text must only hit code identifiers,
-  URLs, and commands).
-- **List A (built HTML + RSC payloads of `/` `/llama` `/llama/<slug>`):**
+### 10.4 Forbidden-string sweep (scoped so it can pass)
+- **List B — source:** scope `app/ components/ data/ lib/ README.md` plus
+  root `*.json`/`*.yaml` (**excluding `node_modules/` and `.next/`**, this
+  plan excluded): `CANNED_REPLY|canned|UI-only demo|demo nonsense|no
+  backend|TODO|FIXME` — zero matches (source gate at **M2**; README at
+  **M4** — its `:41-42` "no backend/canned" die then). Also a **positive
+  check:** `grep -rni ollama app components data lib` — every hit must be a
+  code identifier, URL, command, or this plan (catches `layout.tsx:18`'s
+  metadata and any `.ts` string, not just JSX text).
+- **List A — built HTML + RSC payloads of `/` `/llama` `/llama/<slug>`:**
   `guy hawkins|invite|command d+|slack|zoom|upwork|centra` — zero matches.
-  The bare token `query` is **dropped** (it's the natural parameter name the
-  plan itself prescribes, and legitimate model copy contains it).
+  The bare token `query` is **dropped** (it's the plan's own parameter name;
+  legitimate model copy contains it).
 
 ### 10.5 Manual matrix + accessibility
-- Every §7 row rendered at **1920×1080, 1440×768, 768×1024, 375×812**
-  (1440×768 for sidebar space math; 375×812 for the ≤620 px reorder) —
-  per-milestone subsets: M1 → rows 1–4, 5–6, 22(gone), 26, 33; M2 →
-  5–12, 23–25, 28–30, 32; M3 → 13–17, 18, 27, 31; M4 → 19–21, 26 full.
+- Every §7 row rendered at **1920×1080, 1440×768, 768×1024, 375×812** —
+  per-milestone subsets (aligned with §7's Milestone column):
+  - **M1** → 1, 2, 2b, 3, 4, 5, 6, 18, 26, 33
+  - **M2** → 5–12, 23–25, 28–30, 32, 33, 38
+  - **M3** → 13–17, 3 (Pull-starter leg), 18 (re-verify), 27, 31
+  - **M4** → 19–21, 26 (full, incl. welcome), 34–37
+- **QA recipes for otherwise-unrenderable rows** (round 3):
+  - row 1 (not installed): `OLLAMA_BIN_PATHS= pnpm exec next dev -H 127.0.0.1`
+  - row 2b (not on PATH): run with a stripped `PATH` (e.g.
+    `PATH=/usr/bin:/bin`) so the fallback lookup is what finds it
+  - row 2 (can't reach): `OLLAMA_HOST=http://127.0.0.1:1`
+  - row 3 (0 models): serve with an empty models dir
+    (`OLLAMA_MODELS=<empty dir> ollama serve`) or fixture-level unit check
+- **Space pass criterion (1440×768):** with 20 sessions and AI History open,
+  the OLLAMA header + pill and the `＋ New chat` control remain reachable
+  without scrolling past the fold — or the row list scrolls internally
+  (its `max-height` cap), in which case the section itself still fits.
 - A11y rows: status pill = dot **+ text** with `aria-live="polite"`; pull bar
   = `role="progressbar"` + `aria-valuenow/min/max` + label; disabled inputs
-  have `aria-disabled` + visible placeholder reason; every icon button has an
-  `aria-label` (incl. `＋ New chat`); focus ring visible on
-  Pull/Send/Stop/Re-check/session rows; keyboard-only pass:
-  expand-status → picker → chat → pull → history.
+  have `aria-disabled` + visible reason (rows 32/36/38); every icon button
+  has an `aria-label` (incl. `＋ New chat`); focus ring visible on
+  Pull/Send/Stop/Re-check/session rows; keyboard-only pass: expand-status →
+  picker → chat → pull → history.
 
 ### 10.6 Regressions + visual references
 1. 19 slugs 200, bogus slug 404, `/` + `/llama` 200, all internal links 200.
-2. **Visual diff — manual, explicit (round 2 #8):** committed reference
-   screenshots under `crates/web/qa/baselines/` (home/guide/directory ×
-   1920/768/375 + 1440×768 sidebar-expanded), captured with
-   `npx playwright screenshot` **run locally by the implementer at M4** (not
-   in CI — CI has no browser and §10.3 forbids an e2e runner). Diffing is a
-   human side-by-side recorded in `crates/web/qa/README.md` (which screenshot,
-   what changed, why intentional). CI never runs browsers.
+2. **Visual diff — manual, explicit:** committed reference screenshots under
+   `crates/web/qa/baselines/` (home/guide/directory ×
+   **1920×1080 / 768×1024 / 375×812** + **1440×768** sidebar-expanded),
+   captured with `npx playwright screenshot` run locally by the implementer
+   at M4 (not in CI — CI has no browser and §10.3 forbids an e2e runner).
+   Diffing is a human side-by-side recorded in `crates/web/qa/README.md`
+   (which screenshot, what changed, why intentional).
 3. `bazel build //...` unaffected (`.bazelignore`); CI green (web job =
    lint + test + build).
-4. `git status`: only intended files, nothing outside `crates/web/` (+ root
-   files if M4 touches them); `docs/` + `models/` stay untracked.
+4. `git status`: only intended files — allowed outside `crates/web/` at M4:
+   `.github/workflows/ci.yml` (test step), root `README.md` (if commands
+   changed); `docs/` + `models/` stay untracked.
 
 ---
 
-## 11. Decisions & open questions (input for round 3)
+## 11. Decisions (round-3 answers, folded in — no open questions remain)
 
-**Decided (round 2 inputs):**
-1. *405b / 245 GB maverick pulls in the confirm copy* → **mark them**: the
-   >30B warning line ships (§5.4, §8) — the CLI's ≤30B promise is part of
-   the product's voice.
-2. *Vision chip wording* → `✓ installed (text chat)` for
-   `llama3.2-vision:*` and `llama4:*` (chat has no image input).
-3. *Warm-up heuristic vs `/api/ps` poller* → **heuristic kept** (7 s
-   measured cold-load; a poller adds a second fetch loop for copy that's
-   already honest). Revisit only if M2 QA shows it misleads.
-4. *IPv6* → accepted: IPv4-loopback-only bind; QA uses `127.0.0.1` URLs.
-5. *`--debug-prerender` as a gate* → downgraded to a diagnostic (§10.1) —
-   the hard gate is `pnpm build` exit 0 + no prerender errors + manifest
-   invariants.
-
-**Open for round 3:**
-1. Re-verify §6's `paramsBillions` values against `catalog.rs` entry params
-   and the registry's reported `parameter_size` strings (parsing format:
-   `"8.0B"`, `"109B"`… — confirm the parse rule).
-2. §5.5's session-row `.histrow` styling: new CSS in `globals.css` — confirm
-   it fits the sidebar's existing rhythm without the round-1 space math
-   breaking (the rows appear *above* the raw JSON, growing the section).
-3. Provider size: status + selection + pulling + sessions in one context —
-   does it need `useMemo`/split contexts to avoid re-rendering the whole
-   tree every 5 s? (Round 3 to judge: recommend a concrete split if so.)
-4. Anything round 3 finds new.
+1. **`paramsBillions` provenance + parse:** parse = leading `[0-9.]` run +
+   `parseFloat` (port of `catalog.rs:186-195`, live-verified: `"8.0B"`,
+   `"3.2B"`). Values: the 5 tags overlapping the CLI catalog come from
+   `catalog.rs`; the other 10 from published model specs (registry manifests
+   carry no `parameter_size` — round-3 correction). ±25 % absorbs reporting
+   drift (`llama4:maverick` reports 402B vs nominal 400 — 0.5 %). Recorded
+   in §10.3's assertion table. **Closed.**
+2. **`.histrow` space:** capped at `min(40vh, 300px)` with internal scroll;
+   §5.1's math restated; §10.5 gained an explicit pass criterion. **Closed.**
+3. **Provider shape:** **one** provider (no up-front split), value built with
+   `useMemo` + value-compare before committing `status` so a stable poll
+   causes zero re-renders; split `StatusContext`/`ChatContext` only if M2
+   profiling shows churn. Written into §5.2 so the implementer doesn't
+   re-litigate it. (Round-3 technical auditor preferred a split up front;
+   product auditor preferred one with memoization — resolution: memoized
+   single provider with a measured contingency, which satisfies both
+   concerns without speculative structure.) **Closed.**
