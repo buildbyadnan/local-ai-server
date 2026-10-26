@@ -2,6 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { chatSessions, filterSessions } from "@/data/chat-sessions";
+import OllamaStatus from "@/components/OllamaStatus";
 
 const NAV_ITEMS = [
   {
@@ -94,6 +95,8 @@ export default function Sidebar() {
           </span>
         ))}
       </nav>
+
+      <OllamaStatus />
 
       <div className="lbl">CHAT HISTORY</div>
       <button

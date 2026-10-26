@@ -704,7 +704,7 @@ quoted)
 
 | Where (exact) | ❌ Current | ✅ Shipped |
 |---|---|---|
-| `.desc` (tree) | "Every model below runs on this machine through ollama." | "Browse the Llama family below. Models you've installed show ✓ and can be selected; the rest can be pulled in one click." |
+| `.desc` (tree) | "Every model below runs on this machine through ollama." | "Browse the Llama family below. Models you've installed show ✓ and can be selected; the rest can be pulled in one click." (**M1 ships an interim sentence** — "Open a folder to browse the family, then click any model for a plain-English guide. Models installed on this machine are in the picker above." — because the ✓/Pull claims only become true with M3's chips; canonical copy lands at M3.) |
 | `layout.tsx:18` metadata | "Chat with local models via ollama — …" | Same sentence with **Ollama** capitalized (full metadata line updated at M4) |
 | `CenterChat.tsx:39` header | "Chat with local models via ollama" | "Chat with local models" |
 | `CenterChat.tsx:55-57` `.empty` paragraph | "…this reply would stream…" (canned) + "the dropdown on the right" | M1: "Chat lands next — pick a model to get ready." M2: "Pick a model and say hi — replies stream live from your machine." |
