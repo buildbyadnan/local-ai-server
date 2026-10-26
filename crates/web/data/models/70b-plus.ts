@@ -10,6 +10,9 @@ export const bigTierGuides: ModelGuide[] = [
     released: "25 September 2024",
     sizeLabel: "88.59B parameters",
     contextLabel: "128,000 tokens — text and images",
+    ollamaTag: "llama3.2-vision:90b",
+    pullSize: "55 GB",
+    paramsBillions: [90],
     whatIsIt: [
       "The larger of the two Llama 3.2 Vision models (the 11B lives in the under-30B tier). Same design as the small one: an **untouched Llama 3.1 70B text model** with a cross-attention **vision adapter** bolted on, trained on 6 billion image+text pairs. Its text intelligence is literally the 70B's (the card's text MMLU column reads 86.0).",
       "It takes images plus text and answers in text. Trained uses: document Q&A, chart reading, image reasoning, captioning, grounding and retrieval.",
@@ -102,6 +105,9 @@ export const bigTierGuides: ModelGuide[] = [
     released: "23 July 2024",
     sizeLabel: "405.85B parameters",
     contextLabel: "Huge — 128,000 tokens (~300 pages)",
+    ollamaTag: "llama3.1:405b",
+    pullSize: "243 GB",
+    paramsBillions: [405],
     whatIsIt: [
       "When Meta released Llama 3.1 405B in July 2024 it was **the largest openly available language model in the world** — a dense (non-mixture-of-experts) model with 126 layers, a 16,384-wide brain, grouped-query attention, trained on 15+ trillion tokens at roughly **440,000 petaFLOP-days** of compute.",
       "It came in four flavours: base and Instruct in BF16, plus **FP8** versions of both (an 8-bit format that halves the memory). The FP8 base is the practical form — **463,000 downloads a month** (Oct 2026) versus 28,921 for the BF16 base.",
@@ -199,6 +205,9 @@ export const bigTierGuides: ModelGuide[] = [
     released: "5 April 2025",
     sizeLabel: "108.64B total · 17B active · 16 experts",
     contextLabel: "Claimed up to 10,000,000 tokens (tens of thousands of pages)",
+    ollamaTag: "llama4:scout",
+    pullSize: "67 GB",
+    paramsBillions: [109],
     whatIsIt: [
       "Scout is a **mixture-of-experts (MoE)** model: instead of one giant network, it has 16 'expert' sub-networks, and for each word it writes only **17 billion of its 109 billion parameters** are activated. Translation: answers cost about as much to generate as a 17B model, while *memory* still follows the full 109B.",
       "It's also **natively multimodal** — images join the text stream at the very input layer ('early fusion') rather than being bolted on via an adapter like Llama 3.2 Vision. It was trained on roughly **40 trillion tokens** (the largest Llama corpus), with knowledge cutoff August 2024, 12 supported languages, and image inputs tested up to 5 images.",
@@ -296,6 +305,9 @@ export const bigTierGuides: ModelGuide[] = [
     released: "5 April 2025",
     sizeLabel: "401.58B total · 17B active · 128 experts",
     contextLabel: "1,000,000 tokens (~1,500 pages)",
+    ollamaTag: "llama4:maverick",
+    pullSize: "245 GB",
+    paramsBillions: [400],
     whatIsIt: [
       "Maverick is Meta's strongest Llama: a **128-expert mixture-of-experts** model where only **17B of 401.6B parameters** activate per word, wrapped in natively multimodal early fusion (images and text share one stream from the input layer). Trained on ~22 trillion tokens, **co-distilled from the never-released Llama 4 Behemoth**, knowledge cutoff August 2024, 12 supported languages, up to 5 input images.",
       "Its official numbers top every Llama family table: **GPQA Diamond 69.8** (vs 50.5 for 3.3 70B), **LiveCodeBench 43.4**, **MMMU 73.4**, ChartQA 90.0, DocVQA 94.4, MGSM 92.3 — reasoning, code, math, multilingual and *all* vision metrics.",

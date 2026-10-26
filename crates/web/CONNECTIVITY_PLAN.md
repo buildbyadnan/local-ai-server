@@ -745,6 +745,20 @@ restore notice (§5.5 + row 36), "A model is downloading in the background."
   there is no session store yet, so promising "stays as its own session"
   would be a persistence lie. §5.2's exact sentence lands at M4 with
   `lib/history.ts`.
+- **M3:** the canonical `.desc` sentence ships (the M1 interim sentence is
+  gone with it).
+- **M3:** `pullSize` stores the bare §6 value ("4.9 GB", "2.0 GB"), so
+  §5.4's `about {pullSize}` / `≈{pullSize}` interpolate it verbatim; a
+  trailing `.0` is dropped *at render*, which is what lets §8's starter
+  sentence read "about 2 GB" from that same stored value. One source for
+  the number, both quoted strings exact.
+- **M3:** rows 15/17's disabled reasons ship as the control's own visible
+  label ("Start Ollama first", "Pulling…") rather than a tooltip, so
+  §10.5's "visible reason" rule holds for the tree too.
+- **M3:** the starter CTA replaces two interim empties — the chat's
+  "…the picker has nothing to offer until one is installed." paragraph and
+  the picker's "No models on this machine yet." line (the CTA opens with
+  the same words and adds the action).
 
 Voice check at M4: the section must read like `llama`'s guided recommender
 (same defaults — `DEFAULT_TAG`, same plain-English register).

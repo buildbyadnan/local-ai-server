@@ -2,10 +2,10 @@ import { fileURLToPath } from "node:url";
 import { defineConfig } from "vitest/config";
 
 /**
- * Unit tests cover the pure helpers only (CONNECTIVITY_PLAN §10.3): tag
- * validation, NDJSON buffering/parsing, session filtering, install
- * matching. No framework or browser tests — the manual matrix in §10.5
- * owns integration, and CI has no browser.
+ * Unit tests cover the pure helpers and static data only (CONNECTIVITY_PLAN
+ * §10.3): tag validation, NDJSON buffering/parsing, session filtering,
+ * install matching, guide-data integrity. No framework or browser tests —
+ * the manual matrix in §10.5 owns integration, and CI has no browser.
  */
 export default defineConfig({
   resolve: {
@@ -14,7 +14,7 @@ export default defineConfig({
     },
   },
   test: {
-    include: ["lib/**/*.test.ts"],
+    include: ["lib/**/*.test.ts", "data/**/*.test.ts"],
     environment: "node",
   },
 });

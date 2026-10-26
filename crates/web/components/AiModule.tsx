@@ -1,9 +1,11 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { modelsInTier, tiers } from "@/data/models";
+import { allModels, modelsInTier, tiers } from "@/data/models";
 import { useOllama } from "@/components/ModelProvider";
+import { isTextOnlyChat, matchInstalled } from "@/lib/match";
+import { PullButton, PullNote, PullStatus, StarterCta } from "@/components/Pull";
 
 const FOLDER_ICON = (
   <svg viewBox="0 0 24 24">
@@ -39,6 +41,12 @@ export default function AiModule() {
     ? [...status.models].sort((a, b) => a.name.localeCompare(b.name))
     : [];
   const loaded = status?.loaded ?? [];
+  // Guides this machine satisfies (§6 rules 1–3): chips, select-on-click
+  // rows, and which guides offer a Pull button all key off it.
+  const matches = useMemo(
+    () => matchInstalled(status?.models ?? [], allModels),
+    [status],
+  );
 
   /** Pick from the menu: silent when the chat is empty, confirmed otherwise. */
   function pick(name: string) {
@@ -99,7 +107,7 @@ export default function AiModule() {
         {menuOpen && (
           <div className="modelmenu" role="listbox" aria-label="Model">
             {models.length === 0 && (
-              <p className="mempty">No models on this machine yet.</p>
+              <StarterCta onPullStart={() => setMenuOpen(false)} />
             )}
             {models.map((model) => (
               <button
@@ -122,6 +130,8 @@ export default function AiModule() {
           </div>
         )}
       </div>
+
+      <PullStatus />
 
       {pending && (
         <div className="switchbox">
@@ -158,15 +168,15 @@ export default function AiModule() {
       )}
 
       <p className="desc">
-        Open a folder to browse the family, then click any model for a plain-English
-        guide. Models installed on this machine are in the picker above.
+        Browse the Llama family below. Models you&apos;ve installed show ✓ and
+        can be selected; the rest can be pulled in one click.
       </p>
 
       <div className="ph">Models</div>
 
       <div className="tree">
         {tiers.map((tier) => {
-          const models = modelsInTier(tier.id);
+          const guides = modelsInTier(tier.id);
           const isOpen = openTiers.includes(tier.id);
           return (
             <div key={tier.id}>
@@ -178,17 +188,59 @@ export default function AiModule() {
               >
                 {FOLDER_ICON}
                 {tier.label}
-                <span className="cnt">{models.length}</span>
+                <span className="cnt">{guides.length}</span>
               </button>
               {isOpen && (
                 <ul className="sub">
-                  {models.map((m) => (
-                    <li key={m.slug}>
-                      <Link href={`/llama/${m.slug}`} prefetch>
-                        {m.name}
-                      </Link>
-                    </li>
-                  ))}
+                  {guides.map((m) => {
+                    const matched = matches.get(m.slug);
+                    return (
+                      <li key={m.slug} className="trow">
+                        {matched ? (
+                          // Installed → the row itself starts a chat with it
+                          // (confirm first when the current one has messages).
+                          <button
+                            type="button"
+                            className="tname sel"
+                            disabled={streaming}
+                            aria-disabled={streaming}
+                            title={
+                              streaming
+                                ? "Stop the reply first"
+                                : `Chat with ${matched[0]}`
+                            }
+                            onClick={() => pick(matched[0])}
+                          >
+                            {m.name}
+                          </button>
+                        ) : (
+                          <Link className="tname" href={`/llama/${m.slug}`} prefetch>
+                            {m.name}
+                          </Link>
+                        )}
+                        {matched && (
+                          <span className="chip">
+                            ✓ installed
+                            {isTextOnlyChat(m) ? " (text chat)" : ""}
+                          </span>
+                        )}
+                        {matched ? (
+                          // The guide stays reachable next to the chip.
+                          <Link
+                            className="guide"
+                            href={`/llama/${m.slug}`}
+                            title="Open the guide"
+                            aria-label={`Guide for ${m.name}`}
+                          >
+                            ↗
+                          </Link>
+                        ) : m.ollamaTag ? (
+                          <PullButton guide={m} />
+                        ) : null}
+                        <PullNote tag={m.ollamaTag} />
+                      </li>
+                    );
+                  })}
                 </ul>
               )}
             </div>

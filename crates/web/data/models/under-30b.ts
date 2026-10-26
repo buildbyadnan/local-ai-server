@@ -106,6 +106,9 @@ export const under30bGuides: ModelGuide[] = [
     released: "18 July 2023",
     sizeLabel: "6.7B / 13B parameters",
     contextLabel: "Modest — about 5–6 pages of text",
+    ollamaTag: "llama2:7b",
+    pullSize: "3.8 GB",
+    paramsBillions: [7, 13],
     whatIsIt: [
       "Llama 2 was Meta's 'now it's for everyone' release. Where LLaMA 1 was a gated research curiosity, Llama 2 shipped **weights anyone could download and a licence that allowed commercial use** — announced alongside Microsoft as a distribution partner. This release is what made 'we'll build our startup on an open model' a viable plan in 2023.",
       "Each size came in two flavours: a plain **base** model (continues text) and **Llama-2-Chat** — the first Llama trained with RLHF, a technique where human raters teach the model which answers are good. That chat training is why it behaves like an assistant rather than an autocomplete.",
@@ -206,6 +209,9 @@ export const under30bGuides: ModelGuide[] = [
     released: "24 August 2023",
     sizeLabel: "6.7B / 13B parameters",
     contextLabel: "Long for its era — 16k tokens, claimed useful to ~100k",
+    ollamaTag: "codellama:7b",
+    pullSize: "3.8 GB",
+    paramsBillions: [7, 13],
     whatIsIt: [
       "Code Llama took the Llama 2 models and taught them programming: Meta first continued training them on **500 billion tokens of code**, then added 20 billion more tokens of very long code files so they could handle big contexts. The result was three personalities in each size:",
       "The **base** model for raw completion (finish this function), **Python** (an extra 100 billion Python-only tokens — a Python specialist), and **Instruct** (talk to it in plain English about your code).",
@@ -301,6 +307,9 @@ export const under30bGuides: ModelGuide[] = [
     released: "18 April 2024",
     sizeLabel: "8.03B parameters",
     contextLabel: "Short — 8,192 tokens (about a long chapter)",
+    ollamaTag: "llama3:8b",
+    pullSize: "4.7 GB",
+    paramsBillions: [8],
     whatIsIt: [
       "Llama 3 was Meta's third generation, and the jump from Llama 2 was huge. This 8B model was trained on **over 15 trillion tokens** of text (7.5× more than Llama 2) with a much better data pipeline and a 128,000-word vocabulary so it represents language more efficiently.",
       "It comes as a **base** model and an **Instruct** (chat) version, the latter trained with Meta's improved pipeline that included **more than 10 million human-annotated examples**.",
@@ -398,6 +407,9 @@ export const under30bGuides: ModelGuide[] = [
     released: "23 July 2024",
     sizeLabel: "8.03B parameters",
     contextLabel: "Huge — 128,000 tokens (about a 300-page book)",
+    ollamaTag: "llama3.1:8b",
+    pullSize: "4.9 GB",
+    paramsBillions: [8],
     whatIsIt: [
       "Llama 3.1 is the July 2024 refresh of Llama 3, and the release that turned 'small Llama' into a serious all-rounder. The 8B here has the **same size** as Llama 3 8B but far more capability around it:",
       "**128,000-token context** (16× more to remember), **eight officially supported languages** (English, German, French, Italian, Portuguese, Hindi, Spanish, Thai), and official support for **tool use** — the structured function-calling that lets an assistant actually do things (look up data, call your APIs).",
@@ -503,6 +515,9 @@ export const under30bGuides: ModelGuide[] = [
     released: "25 September 2024",
     sizeLabel: "1.24B / 3.21B parameters",
     contextLabel: "Huge for their size — 128,000 tokens",
+    ollamaTag: "llama3.2:3b",
+    pullSize: "2.0 GB",
+    paramsBillions: [1, 3],
     whatIsIt: [
       "These are the smallest Llamas ever released — the 1B is about the size of a fingernail compared to the 405B flagship. They were built for **phones, browsers, and other constrained devices**, where a 16 GB model simply cannot live.",
       "The clever part: they weren't trained from scratch. Meta **pruned** the bigger Llama 3.1 lineage down and used **knowledge distillation** — the 8B and 70B models' outputs were used as teaching targets during training, so the little models learned to predict text the way the big ones do.",
@@ -600,6 +615,9 @@ export const under30bGuides: ModelGuide[] = [
     released: "25 September 2024",
     sizeLabel: "10.64B / 10.67B parameters",
     contextLabel: "128,000 tokens — text and images",
+    ollamaTag: "llama3.2-vision:11b",
+    pullSize: "7.8 GB",
+    paramsBillions: [11],
     whatIsIt: [
       "Until this release, Llamas were blind — text only. Llama 3.2 Vision fixed that with an elegant trick: **the language model underneath is an untouched Llama 3.1**, and Meta bolted on a separately trained **vision adapter** — 'a series of cross-attention layers [that] feed image encoder representations into the core LLM'.",
       "In plain terms: a camera module was attached to a normal Llama's brain without rewiring the brain itself. It was trained on **6 billion image+text pairs**.",

@@ -106,6 +106,9 @@ export const midTierGuides: ModelGuide[] = [
     released: "18 July 2023",
     sizeLabel: "68.98B parameters",
     contextLabel: "Modest — 4,096 tokens (~5–6 pages)",
+    ollamaTag: "llama2:70b",
+    pullSize: "39 GB",
+    paramsBillions: [70],
     whatIsIt: [
       "Llama 2 70B was a big deal in 2023: the first **70-billion-class** openly released model you could legally build a business on. It came as a base model and **Llama-2-Chat**, Meta's RLHF-tuned dialogue version.",
       "It also introduced a genuine architectural improvement: **Grouped-Query Attention (GQA)** — the model shares its memory-tracking apparatus across attention heads instead of keeping a copy per head. Meta enabled it *only* on the 70B (the 7B/13B didn't get it), because at this size the memory savings were what made serving practical. Every Llama since has GQA everywhere.",
@@ -206,6 +209,9 @@ export const midTierGuides: ModelGuide[] = [
     released: "34B: 24 August 2023 · 70B: 29 January 2024",
     sizeLabel: "33.74B / 68.98B parameters",
     contextLabel: "16k trained (claimed useful to ~100k) — with exceptions",
+    ollamaTag: "codellama:34b",
+    pullSize: "19 GB",
+    paramsBillions: [34, 70],
     whatIsIt: [
       "The heavyweight members of Meta's Code Llama family (the 7B/13B live in the under-30B tier). Same recipe as the small ones — Llama 2 continued on 500 billion tokens of code plus long-context training — at sizes built for more demanding coding work.",
       "The **34B** (August 2023) carried the release headline: **'up to 67% HumanEval and 65% MBPP, state of the art among open models'** at the time. The **70B** followed five months later as Meta's answer to community 70B code models.",
@@ -302,6 +308,9 @@ export const midTierGuides: ModelGuide[] = [
     released: "18 April 2024",
     sizeLabel: "70.55B parameters",
     contextLabel: "Short — 8,192 tokens (~12 pages)",
+    ollamaTag: "llama3:70b",
+    pullSize: "40 GB",
+    paramsBillions: [70],
     whatIsIt: [
       "The big member of the Llama 3 launch, and for months the best openly available model in the world. Base and Instruct versions, trained on **15+ trillion tokens** with a 128k-word vocabulary, grouped-query attention, and **6.4 million H100 GPU-hours** of training behind it.",
       "At release Meta showed it beating **Gemini Pro 1.5** and **Claude 3 Sonnet** on most reported benchmarks — and it wasn't hype: HumanEval 81.7 (coding) and MMLU 82.0 (knowledge) were genuinely leading numbers for open weights in mid-2024.",
@@ -398,6 +407,9 @@ export const midTierGuides: ModelGuide[] = [
     released: "23 July 2024",
     sizeLabel: "70.55B parameters",
     contextLabel: "Huge — 128,000 tokens (~300 pages)",
+    ollamaTag: "llama3.1:70b",
+    pullSize: "43 GB",
+    paramsBillions: [70],
     whatIsIt: [
       "Llama 3.1 70B is what you get when the Llama 3 recipe gets the full modern package: **128,000-token context**, **eight supported languages**, **tool calling** (BFCL v2: 77.5), plus base **and** Instruct versions — everything a deployment or a fine-tuning program needs at one size.",
       "Architecture: 80 layers, 8,192-wide, grouped-query attention, RoPE stretched for 128k, 15T+ tokens of training, December 2023 knowledge cutoff.",
@@ -493,6 +505,9 @@ export const midTierGuides: ModelGuide[] = [
     released: "6 December 2024",
     sizeLabel: "70.55B parameters",
     contextLabel: "Huge — 128,000 tokens (~300 pages)",
+    ollamaTag: "llama3.3:70b",
+    pullSize: "42 GB",
+    paramsBillions: [70],
     whatIsIt: [
       "Llama 3.3 is a single model: **70B, Instruct-only** (no base version), multilingual text in/out. Its entire story is 'flagship quality at a fifth of the cost'.",
       "Meta fine-tuned it on public instruction data **plus over 25 million synthetically generated examples**, spending **7.0 million H100 GPU-hours** (12.9 tonnes CO₂e) — an enormous post-training budget for one 70B checkpoint.",

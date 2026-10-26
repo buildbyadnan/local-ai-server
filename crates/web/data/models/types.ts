@@ -31,6 +31,18 @@ export interface ModelGuide {
   released: string;
   sizeLabel: string;
   contextLabel: string;
+  /**
+   * Exact `ollama pull` tag when this guide maps to a registry model
+   * (CONNECTIVITY_PLAN §6). Guides without it are guide-only — never a
+   * chip, never a Pull button.
+   */
+  ollamaTag?: string;
+  /** Download size for the confirm step ("4.9 GB"). Required with `ollamaTag`. */
+  pullSize?: string;
+  /** Nominal parameter counts (billions) — §6's matching rule compares an
+      installed `parameter_size` against these at ±25%. Required with
+      `ollamaTag`. */
+  paramsBillions?: number[];
   /** What is this model? (plain words) */
   whatIsIt: string[];
   /** Why was it made / what problem? */

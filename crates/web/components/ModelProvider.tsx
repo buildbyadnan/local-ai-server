@@ -10,10 +10,11 @@
  * memoized, and a fresh status snapshot is committed **only when it differs
  * by value** — an unchanged 5 s poll causes zero re-renders. Conversation
  * text itself stays inside CenterChat so per-token updates never re-render
- * the sidebar or the model tree; the provider only carries the two flags
- * other components need (streaming, chat-empty). Fields are added here as
- * later milestones need them (pull state at M3, sessions at M4); nothing
- * unused ships before then.
+ * the sidebar or the model tree; the provider only carries the flags other
+ * components need (streaming, chat-empty, an active pull). Pull progress is
+ * committed at most every 100 ms because Ollama emits a line per layer
+ * chunk — far faster than anyone can read a percentage. M4 adds the
+ * session store here; nothing unused ships before then.
  */
 import {
   createContext,
@@ -25,9 +26,50 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { feedChunk, parseJsonLine } from "@/lib/ndjson";
 import type { OllamaStatus } from "@/lib/ollama-types";
 
 const SELECTED_KEY = "las.selected.v1";
+
+/** One `{"status", "digest", "total", "completed", "error"}` pull line. */
+interface PullLine {
+  status?: unknown;
+  digest?: unknown;
+  total?: unknown;
+  completed?: unknown;
+  error?: unknown;
+}
+
+/** Row 31 — the pull stream ended before Ollama finished the download. */
+const CONNECTION_LOST =
+  "Connection lost mid-download — Ollama will finish it next time you pull.";
+
+/** Live progress of the one pull allowed at a time (§5.4). */
+export interface PullProgress {
+  /** Tag being downloaded — the tree row and chat note key off it. */
+  tag: string;
+  /** 0–100 once Ollama reports layer totals, null while it hasn't. */
+  percent: number | null;
+  /** Ollama's own status word ("pulling manifest", "downloading", …). */
+  status: string;
+  /** The guide's size estimate — the only number shown before totals land. */
+  pullSize: string;
+}
+
+export type PullNoteKind =
+  /** row 13 — Ollama's own failure message */
+  | "error"
+  /** row 14 — the user cancelled */
+  | "stopped"
+  /** row 16 — finished while the chat was busy */
+  | "ready";
+
+/** Terminal outcome of the last pull, rendered inline in its tree row. */
+export interface PullNote {
+  tag: string;
+  kind: PullNoteKind;
+  text: string;
+}
 
 export interface OllamaContext {
   /** `checking` until the first status response resolves. */
@@ -48,6 +90,14 @@ export interface OllamaContext {
   /** True while the open chat has no messages — gates the switch confirm. */
   chatEmpty: boolean;
   setChatEmpty: (value: boolean) => void;
+  /** The single in-flight pull, or null (one at a time — row 17). */
+  pulling: PullProgress | null;
+  /** Outcome of the last finished pull (red error / stop / ready line). */
+  pullNote: PullNote | null;
+  /** Start pulling `tag`; `pullSize` is the guide's estimate (§5.4). */
+  startPull: (tag: string, pullSize: string) => void;
+  /** Abort the pull fetch — Ollama keeps whatever layers it already wrote. */
+  cancelPull: () => void;
 }
 
 const OllamaContext = createContext<OllamaContext | null>(null);
@@ -66,7 +116,9 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const [selected, setSelected] = useState<string | null>(null);
   const [removed, setRemoved] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
-  const [chatEmpty, setChatEmpty] = useState(true);
+  const [chatEmpty, setChatEmptyState] = useState(true);
+  const [pulling, setPulling] = useState<PullProgress | null>(null);
+  const [pullNote, setPullNote] = useState<PullNote | null>(null);
 
   // Poll bookkeeping: `seq` ensures only the latest response is applied,
   // the controller lets a new poll supersede an in-flight one.
@@ -74,14 +126,18 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const abortRef = useRef<AbortController | null>(null);
   const serializedRef = useRef<string>("");
   const selectedRef = useRef<string | null>(null);
+  /** Mirrors `chatEmpty` for the pull callback without re-subscribing it. */
+  const chatEmptyRef = useRef(true);
+  /** The in-flight pull's controller — the provider's one-at-a-time lock. */
+  const pullRef = useRef<AbortController | null>(null);
 
-  const refresh = useCallback(() => {
+  const refresh = useCallback((): Promise<void> => {
     const seq = ++seqRef.current;
     abortRef.current?.abort();
     const controller = new AbortController();
     abortRef.current = controller;
 
-    fetch("/api/ollama/status", { cache: "no-store", signal: controller.signal })
+    return fetch("/api/ollama/status", { cache: "no-store", signal: controller.signal })
       .then((response) =>
         response.ok
           ? (response.json() as Promise<OllamaStatus>)
@@ -163,6 +219,188 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
     }
   }, []);
 
+  /** Mirror for `chatEmpty` — the pull callback reads the live value. */
+  const setChatEmpty = useCallback((value: boolean) => {
+    chatEmptyRef.current = value;
+    setChatEmptyState(value);
+  }, []);
+
+  const cancelPull = useCallback(() => {
+    pullRef.current?.abort(); // §3.5 — aborts the proxy, which aborts Ollama
+  }, []);
+
+  /**
+   * Pull `tag` (§5.4): one at a time, aggregated progress across layers,
+   * terminal outcome as an inline note on that guide's row. Success
+   * refreshes the model list and auto-selects only when the chat is empty.
+   */
+  const startPull = useCallback(
+    (tag: string, pullSize: string) => {
+      if (pullRef.current) return; // row 17 — one pull at a time
+      const controller = new AbortController();
+      pullRef.current = controller;
+      setPullNote(null);
+      setPulling({ tag, percent: null, status: "starting", pullSize });
+
+      // Ollama reports one line per layer chunk (far faster than a human
+      // reads a percentage), so commits are time-gated to every 100 ms.
+      const layers = new Map<string, { total: number; completed: number }>();
+      let statusText = "starting";
+      let lastCommit = 0;
+      /** Ollama ends every finished pull with {"status":"success"}. */
+      let sawSuccess = false;
+
+      const snapshot = (): PullProgress => {
+        let total = 0;
+        let completed = 0;
+        for (const layer of layers.values()) {
+          total += layer.total;
+          completed += layer.completed;
+        }
+        return {
+          tag,
+          status: statusText,
+          pullSize,
+          // No totals yet → null: the bar renders indeterminate (§5.4).
+          percent: total > 0 ? Math.min(100, (completed / total) * 100) : null,
+        };
+      };
+
+      const commit = (force = false) => {
+        const now = Date.now();
+        if (!force && now - lastCommit < 100) return;
+        lastCommit = now;
+        setPulling(snapshot());
+      };
+
+      /** One pull line → failure text (row 13), or null to keep reading. */
+      const handleLine = (line: string): string | null => {
+        const parsed = parseJsonLine<PullLine>(line);
+        if (!parsed) return null; // blank or damaged line: never fatal (row 29)
+        if (typeof parsed.error === "string") return parsed.error;
+        if (typeof parsed.status === "string") {
+          if (parsed.status === "success") sawSuccess = true;
+          // The bar carries digests; the status word stays human-readable.
+          statusText =
+            parsed.status.replace(/\s*sha256:[0-9a-f]+\b.*/, "").trim() ||
+            parsed.status;
+        }
+        // Last write wins per digest (§5.4).
+        if (
+          typeof parsed.digest === "string" &&
+          typeof parsed.total === "number" &&
+          typeof parsed.completed === "number"
+        ) {
+          layers.set(parsed.digest, {
+            total: parsed.total,
+            completed: parsed.completed,
+          });
+        }
+        commit();
+        return null;
+      };
+
+      void (async () => {
+        let note: PullNote | null = null;
+        let failure: string | null = null;
+        try {
+          const response = await fetch("/api/ollama/pull", {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ model: tag, stream: true }),
+            signal: controller.signal,
+          });
+          if (!response.ok) {
+            // Ollama reports pull failures as {error} (404 for a tag that
+            // doesn't exist, 500 for a broken registry answer).
+            const body = (await response.json().catch(() => null)) as {
+              error?: string;
+            } | null;
+            failure = body?.error ?? `Ollama refused the pull (HTTP ${response.status}).`;
+          } else {
+            const reader = response.body?.getReader();
+            if (!reader) {
+              failure = "the download stream was empty";
+            } else {
+              const decoder = new TextDecoder();
+              let buffer = "";
+              const drain = (lines: string[]): boolean => {
+                for (const line of lines) {
+                  const error = handleLine(line);
+                  if (error !== null) {
+                    failure = error;
+                    return false;
+                  }
+                }
+                return true;
+              };
+              read: for (;;) {
+                const { done, value } = await reader.read();
+                if (done) break;
+                const fed = feedChunk(buffer, decoder.decode(value, { stream: true }));
+                buffer = fed.rest;
+                if (!drain(fed.lines)) break read;
+              }
+              if (failure) {
+                await reader.cancel().catch(() => undefined);
+              } else {
+                const flush = feedChunk(buffer, decoder.decode());
+                drain([...flush.lines, flush.rest]);
+              }
+            }
+          }
+        } catch (err) {
+          note =
+            err instanceof DOMException && err.name === "AbortError"
+              ? {
+                  // Row 14 + §8 — the layers already written stay on disk.
+                  tag,
+                  kind: "stopped",
+                  text: "Download stopped. Ollama may pick it back up next time.",
+                }
+              : {
+                  // Row 31 — transport drop, not Ollama's own failure.
+                  tag,
+                  kind: "error",
+                  text: CONNECTION_LOST,
+                };
+        } finally {
+          pullRef.current = null;
+          setPulling(null);
+        }
+
+        if (note === null && failure !== null) {
+          note = { tag, kind: "error", text: `Pull failed: ${failure}` };
+        }
+        if (note === null && !sawSuccess) {
+          // The body ended without Ollama's success line — a stream that
+          // stopped early is the same honest outcome as a dropped socket
+          // (row 31), never a silent "it worked".
+          note = { tag, kind: "error", text: CONNECTION_LOST };
+        }
+        if (note !== null) {
+          setPullNote(note);
+          return;
+        }
+
+        // Success (§5.4): re-read tags, then auto-select only if the chat
+        // is empty — otherwise offer the switch instead of hijacking it.
+        void refresh().then(() => {
+          if (chatEmptyRef.current) {
+            select(tag);
+          } else {
+            setPullNote({
+              tag,
+              kind: "ready",
+              text: "Ready — switch models from the picker.",
+            });
+          }
+        });
+      })();
+    },
+    [refresh, select],
+  );
+
   const value = useMemo<OllamaContext>(
     () => ({
       phase,
@@ -175,8 +413,26 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
       setStreaming,
       chatEmpty,
       setChatEmpty,
+      pulling,
+      pullNote,
+      startPull,
+      cancelPull,
     }),
-    [phase, status, selected, removed, select, refresh, streaming, chatEmpty],
+    [
+      phase,
+      status,
+      selected,
+      removed,
+      select,
+      refresh,
+      streaming,
+      chatEmpty,
+      setChatEmpty,
+      pulling,
+      pullNote,
+      startPull,
+      cancelPull,
+    ],
   );
 
   return <OllamaContext.Provider value={value}>{children}</OllamaContext.Provider>;

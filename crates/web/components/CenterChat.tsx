@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useOllama } from "@/components/ModelProvider";
+import { StarterCta } from "@/components/Pull";
 import { feedChunk, parseJsonLine } from "@/lib/ndjson";
 
 interface Bubble {
@@ -43,8 +44,9 @@ function isOverflow(text: string): boolean {
  * The chat pane's inner view: it owns the conversation and the streaming
  * pipeline (CONNECTIVITY_PLAN §5.3): guarded send, split-safe NDJSON
  * parsing via `lib/ndjson`, Stop via AbortController, warm-up line, and the
- * honest error states from the §7 matrix. The provider only carries
- * `streaming`/`chatEmpty` so other panels can gate on them.
+ * honest error states from the §7 matrix. The provider only carries the
+ * coordination flags (streaming, chat-empty, an active pull) so other
+ * panels can gate on them.
  *
  * `CenterChat` remounts this component with `key={selected}`, so changing
  * model starts a fresh conversation without a reset-effect (§5.5) — the
@@ -59,6 +61,7 @@ function Conversation() {
     streaming,
     setStreaming,
     setChatEmpty,
+    pulling,
   } = useOllama();
   const [draft, setDraft] = useState("");
   const [messages, setMessages] = useState<Bubble[]>([]);
@@ -300,11 +303,14 @@ function Conversation() {
               </svg>
             </span>
             <b>No messages yet</b>
-            <p>
-              {noModels
-                ? "No models on this machine yet — the picker has nothing to offer until one is installed."
-                : "Pick a model and say hi — replies stream live from your machine."}
-            </p>
+            {noModels ? (
+              <StarterCta />
+            ) : (
+              <p>
+                Pick a model and say hi — replies stream live from your
+                machine.
+              </p>
+            )}
           </div>
         ) : (
           <div className="msgs" ref={scrollRef}>
@@ -322,6 +328,12 @@ function Conversation() {
               </div>
             ))}
           </div>
+        )}
+
+        {pulling && (
+          <p className="pullnote" role="status">
+            A model is downloading in the background.
+          </p>
         )}
 
         {warming && (
