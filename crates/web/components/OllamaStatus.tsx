@@ -106,6 +106,7 @@ export default function OllamaStatus() {
       <button
         type="button"
         className="histbtn"
+        id="ollama-section"
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
@@ -227,7 +228,7 @@ export default function OllamaStatus() {
           )}
 
           <div className="oact">
-            <button type="button" className="orecheck" onClick={refresh}>
+            <button type="button" className="btn" onClick={refresh}>
               Re-check
             </button>
           </div>

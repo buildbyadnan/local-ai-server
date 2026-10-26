@@ -8,9 +8,12 @@
  *
  * Re-render discipline (CONNECTIVITY_PLAN §11.3): the context value is
  * memoized, and a fresh status snapshot is committed **only when it differs
- * by value** — an unchanged 5 s poll causes zero re-renders.
- * Fields are added here as later milestones need them (pull state at M3,
- * sessions at M4); nothing unused ships before then.
+ * by value** — an unchanged 5 s poll causes zero re-renders. Conversation
+ * text itself stays inside CenterChat so per-token updates never re-render
+ * the sidebar or the model tree; the provider only carries the two flags
+ * other components need (streaming, chat-empty). Fields are added here as
+ * later milestones need them (pull state at M3, sessions at M4); nothing
+ * unused ships before then.
  */
 import {
   createContext,
@@ -39,6 +42,12 @@ export interface OllamaContext {
   select: (name: string) => void;
   /** Re-run the status poll now (Re-check button, after pulls). */
   refresh: () => void;
+  /** True while a reply streams — consumers gate input on it (rows 32/38). */
+  streaming: boolean;
+  setStreaming: (value: boolean) => void;
+  /** True while the open chat has no messages — gates the switch confirm. */
+  chatEmpty: boolean;
+  setChatEmpty: (value: boolean) => void;
 }
 
 const OllamaContext = createContext<OllamaContext | null>(null);
@@ -56,6 +65,8 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<OllamaStatus | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [removed, setRemoved] = useState<string | null>(null);
+  const [streaming, setStreaming] = useState(false);
+  const [chatEmpty, setChatEmpty] = useState(true);
 
   // Poll bookkeeping: `seq` ensures only the latest response is applied,
   // the controller lets a new poll supersede an in-flight one.
@@ -153,8 +164,19 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const value = useMemo<OllamaContext>(
-    () => ({ phase, status, selected, removed, select, refresh }),
-    [phase, status, selected, removed, select, refresh],
+    () => ({
+      phase,
+      status,
+      selected,
+      removed,
+      select,
+      refresh,
+      streaming,
+      setStreaming,
+      chatEmpty,
+      setChatEmpty,
+    }),
+    [phase, status, selected, removed, select, refresh, streaming, chatEmpty],
   );
 
   return <OllamaContext.Provider value={value}>{children}</OllamaContext.Provider>;

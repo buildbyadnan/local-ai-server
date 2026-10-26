@@ -733,6 +733,19 @@ Also normative as quoted elsewhere in this plan: `Switch / Cancel` (§5.2),
 restore notice (§5.5 + row 36), "A model is downloading in the background."
 (§5.4).
 
+**Milestone copy notes (recorded as each milestone ships):**
+- **M1:** the `.empty` row's M1 sentence shipped as the *disabled input's*
+  placeholder (§9's explicit instruction); the paragraph carried interim
+  copy so the two didn't repeat. The canonical `.empty` paragraph copy
+  lands at M2 — when the input becomes live and the placeholder reverts to
+  "Message the local model…" (a §8 row was never defined for it).
+- **M1:** `.desc` interim sentence — see the row above.
+- **M2:** the switch confirm ships "Switch to {model}? This starts a new
+  chat — the current one won't be saved." instead of §5.2's sentence: at M2
+  there is no session store yet, so promising "stays as its own session"
+  would be a persistence lie. §5.2's exact sentence lands at M4 with
+  `lib/history.ts`.
+
 Voice check at M4: the section must read like `llama`'s guided recommender
 (same defaults — `DEFAULT_TAG`, same plain-English register).
 

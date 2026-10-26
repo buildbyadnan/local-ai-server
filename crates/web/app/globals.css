@@ -413,7 +413,7 @@ a:focus-visible {
   display: flex;
   gap: 6px;
 }
-.orecheck {
+.btn {
   padding: 5px 10px;
   border: 1px solid var(--line);
   border-radius: 8px;
@@ -421,11 +421,11 @@ a:focus-visible {
   color: var(--tx);
   font-size: 10px;
 }
-.orecheck:hover {
+.btn:hover {
   border-color: #2e8a3d;
   color: var(--g);
 }
-.orecheck:focus-visible {
+.btn:focus-visible {
   outline: 1px solid var(--g);
   outline-offset: 2px;
 }
@@ -593,6 +593,51 @@ a:focus-visible {
 .send:disabled:hover {
   filter: none;
 }
+.send.stop {
+  background: linear-gradient(180deg, #e08a7f, #a34b3f);
+  box-shadow: 0 0 18px #e08a7f55;
+}
+.chatnotice {
+  padding: 8px 10px;
+  border: 1px solid #5a4a1e;
+  border-radius: 10px;
+  background: #1c1a0c;
+  color: var(--y);
+  font-size: 10.5px;
+  line-height: 1.5;
+  text-align: left;
+}
+.chatnotice:hover {
+  border-color: var(--y);
+}
+.chatnotice:focus-visible {
+  outline: 1px solid var(--y);
+  outline-offset: 2px;
+}
+.warm {
+  margin: 0;
+  color: var(--y);
+  font-size: 10.5px;
+}
+.errbox {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 9px 10px;
+  border: 1px solid #5a2a24;
+  border-radius: 10px;
+  background: #1b1210;
+}
+.errbox p {
+  margin: 0;
+  color: var(--bad);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+.erracts {
+  display: flex;
+  gap: 6px;
+}
 .note {
   text-align: center;
   color: var(--dim);
@@ -640,6 +685,22 @@ a:focus-visible {
 .model:disabled:hover {
   border-color: #1e5a2a;
   color: var(--g);
+}
+.switchbox {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #101310;
+  color: var(--mut);
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+.switchbox .row {
+  display: flex;
+  gap: 6px;
 }
 .modelmenu {
   position: absolute;

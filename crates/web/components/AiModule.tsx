@@ -19,8 +19,18 @@ function formatSize(bytes: number): string {
 }
 
 export default function AiModule() {
-  const { phase, status, selected, removed, select } = useOllama();
+  const {
+    phase,
+    status,
+    selected,
+    removed,
+    select,
+    streaming,
+    chatEmpty,
+  } = useOllama();
   const [menuOpen, setMenuOpen] = useState(false);
+  /** Model awaiting confirmation before it replaces a chat with messages. */
+  const [pending, setPending] = useState<string | null>(null);
   const [openTiers, setOpenTiers] = useState<string[]>(["30-70b"]);
   const wrapRef = useRef<HTMLDivElement>(null);
 
@@ -29,6 +39,17 @@ export default function AiModule() {
     ? [...status.models].sort((a, b) => a.name.localeCompare(b.name))
     : [];
   const loaded = status?.loaded ?? [];
+
+  /** Pick from the menu: silent when the chat is empty, confirmed otherwise. */
+  function pick(name: string) {
+    setMenuOpen(false);
+    if (name === selected) return;
+    if (chatEmpty) {
+      select(name);
+      return;
+    }
+    setPending(name);
+  }
 
   // Close the model menu on outside click or Escape.
   useEffect(() => {
@@ -66,7 +87,8 @@ export default function AiModule() {
           id="model-picker"
           aria-expanded={menuOpen}
           aria-haspopup="listbox"
-          disabled={phase === "checking"}
+          disabled={phase === "checking" || streaming}
+          title={streaming ? "Stop the reply first" : undefined}
           onClick={() => setMenuOpen((v) => !v)}
         >
           {phase === "checking"
@@ -85,10 +107,7 @@ export default function AiModule() {
                 type="button"
                 role="option"
                 aria-selected={model.name === selected}
-                onClick={() => {
-                  select(model.name);
-                  setMenuOpen(false);
-                }}
+                onClick={() => pick(model.name)}
               >
                 <span className="ck" aria-hidden="true">
                   {model.name === selected ? "✓" : null}
@@ -103,6 +122,34 @@ export default function AiModule() {
           </div>
         )}
       </div>
+
+      {pending && (
+        <div className="switchbox">
+          <span>
+            Switch to {pending}? This starts a new chat — the current one
+            won&apos;t be saved.
+          </span>
+          <span className="row">
+            <button
+              type="button"
+              className="btn"
+              onClick={() => {
+                select(pending);
+                setPending(null);
+              }}
+            >
+              Switch
+            </button>
+            <button
+              type="button"
+              className="btn"
+              onClick={() => setPending(null)}
+            >
+              Cancel
+            </button>
+          </span>
+        </div>
+      )}
 
       {removed && (
         <p className="oremove">
