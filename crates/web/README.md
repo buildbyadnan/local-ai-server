@@ -17,7 +17,7 @@ browser.
 
 | What                                | Why                                | Where to get it                          |
 | ----------------------------------- | ---------------------------------- | ---------------------------------------- |
-| **Node.js 20+**                     | runs this web app                  | <https://nodejs.org> — pick the **LTS**   |
+| **Node.js 22.23.4+**               | runs this web app                  | <https://nodejs.org> — pick the **LTS**   |
 | **pnpm 12**                         | downloads the app's packages       | ships with Node: run `corepack enable` once (or `npm install -g pnpm`) |
 | **[Ollama](https://ollama.com)**   | the local AI server that runs the models | <https://ollama.com/download>       |
 | **~2 GB of disk**                   | room for one small model           | —                                        |
@@ -54,6 +54,7 @@ Press `Ctrl+C` in the terminal to stop the app.
 
 | You see                                             | Do this                                                                 |
 | --------------------------------------------------- | ----------------------------------------------------------------------- |
+| `EBADENGINE` / `Unsupported engine` on `pnpm install` | Your Node is too old — install 22.23.4+ (see above), then `pnpm install` again |
 | `pnpm: command not found`                           | `npm install -g pnpm`, then run `pnpm install` again                    |
 | The pill says **Not installed**                     | Install Ollama from <https://ollama.com/download>, then reload the page |
 | The pill says **Not running**                       | Start Ollama (`ollama serve`, or open the app), then click **Re-check** |
@@ -73,7 +74,16 @@ pnpm build       # production build (28 routes)
 pnpm start       # serve the production build (bound to 127.0.0.1)
 ```
 
-Requires Node 20+ and pnpm 12 (pinned via `packageManager`).
+Requires Node **22.23.4 or newer** (Node 24 LTS also works; anything older
+is affected by the October 2026 Brotli RCE, CVE-2026-111497, so `package.json`
+declares `engines.node: ">=22.23.4"`) and pnpm 12 (pinned via `packageManager`).
+Check yours with `node -v`; to upgrade without touching the system install:
+
+```bash
+curl -fsSL https://nodejs.org/dist/v22.23.4/node-v22.23.4-linux-x64.tar.xz | tar -xJ -C "$HOME/.local"
+export PATH="$HOME/.local/node-v22.23.4-linux-x64/bin:$PATH"   # add to ~/.bashrc
+node -v   # v22.23.4
+```
 
 ## What's in the box
 

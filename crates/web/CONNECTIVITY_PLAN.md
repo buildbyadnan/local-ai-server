@@ -214,6 +214,11 @@ requests**, request-object properties, or `connection()`.
   the GET handler takes the route down, and if anyone reorders the handler
   so a promise runs before the first request access, an uncaught rejection
   fails `pnpm build`. Fallbacks in §4.1 are therefore load-bearing.
+  **M0 extends the same ordering to the proxy:** `/api/*` requests carrying
+  any `Content-Encoding` other than `identity` are refused with **415**
+  before a handler can see the body — the standing mitigation for the
+  bundled Brotli decoder RCE (CVE-2026-111497), kept even on patched Node.
+  Guards (Host → Origin) always precede `readJsonBody` in every handler.
 - The **network fetch** is what guarantees non-prerendering (the documented
   bail). `process.env` reads alone are *not* dynamic.
 - Status fetches use `cache: "no-store"`; responses send
@@ -299,6 +304,8 @@ pnpm exec next start -H 127.0.0.1   # production build, loopback only
   resolvers prefer `::1` for `localhost`).
 - M4 changes the `package.json` `start` script to
   `next start -H 127.0.0.1` so the default can't be exposed by accident.
+- **M0** does the same for `dev` (`"dev": "next dev -H 127.0.0.1"`) — the
+  rule is "loopback by default", not "loopback in production".
 
 ---
 
@@ -833,9 +840,56 @@ Voice check at M4: the section must read like `llama`'s guided recommender
   6. `qa/baselines/` + `qa/README.md` captured (§10.6).
   *Done when:* every §8 row is the shipped copy; §10 checklist signed off.
 
-Deferred (explicitly out of scope): model deletion, `llama catalog --json`
-alignment, autostart, multi-remote servers, parameter tuning, image input in
-chat (vision guides get `(text chat)` chips; vision *input* is a separate
+- **M0 — Runtime floor + loopback everywhere (security).** `engines.node`
+  `>=22.23.4` + `engineStrict: true` (pnpm 12 reads settings from
+  `pnpm-workspace.yaml`, not `.npmrc`), README prerequisites updated in both
+  READMEs, `"dev": "next dev -H 127.0.0.1"`, and the proxy-level
+  `Content-Encoding` refusal from §3.3. *Done when:* `pnpm install` on an
+  older Node fails loudly with `ERR_PNPM_UNSUPPORTED_ENGINE`, `br`-encoded
+  API bodies get 415, guards still 403 foreign Host/Origin, and the whole
+  §10 subset is green on Node 22.23.4.
+- **M5 — Contextual Ollama actions + system info.** State-driven buttons
+  (Install / Start / Re-check / Show models / Update / Re-install), a shared
+  focus-trapped modal, the all-models dialog with copy + confirmed delete
+  (allowlisted `ollama rm <tag>` only — never free-form shell, never an
+  executed installer), and `GET /api/system` behind the same guards feeding a
+  System-info row above OLLAMA. *Done when:* each of the three probe states
+  (not installed / not running / running) shows exactly its own buttons, and
+  the system dialog reports OS, CPU, RAM, disk, Ollama version, model count
+  and sizes correctly.
+- **M6 — Llama-only picker.** Status payload gains `families`; a pure
+  `isLlamaModel()` gates the dropdown; a persisted non-Llama selection is
+  cleared with an honest line. Non-Llama models stay visible **and
+  deletable** under OLLAMA (system truth) but can never be selected for
+  chat. *Done when:* `gemma4:12b` is absent from `#model-picker`, present in
+  the OLLAMA model list, and `matchInstalled`/guides are unchanged.
+- **M7 — Server-side history + human history UI.** `node:sqlite` store
+  (`crates/web/.data/history.db`, WAL), `GET/POST/DELETE /api/history`,
+  one-time migration of `las.sessions.v1`, localStorage demoted to a read
+  cache, cross-tab via `BroadcastChannel`, and the raw-JSON `<pre>` **and
+  its copy rows deleted** — replaced by searchable session cards with
+  per-row delete, delete-all (typed confirm) and export. *Done when:* two
+  different Chrome profiles against the same server show the same sessions,
+  deletion is honoured server-side, and no `JSON.stringify` of history is
+  ever rendered.
+- **M8 — Per-tab selection + parallel chats.** Selection moves to
+  `sessionStorage` (the cross-tab `SELECTED_KEY` listener is removed), so
+  two tabs can hold different models — measured parallel on this hardware —
+  plus an honest "Waiting for the model — another chat may be using it"
+  state when the first token is slow (same-model requests queue at
+  `OLLAMA_NUM_PARALLEL=1`; noted in System info). *Done when:* two tabs
+  select independently and both streams produce first tokens while the other
+  is still running.
+- **M9 — Desktop-responsive pass + baselines.** Fluid shell
+  (`min(1680px, 100%)` replacing the 1000 px cap), `clamp()` column tracks,
+  independently scrolling panels, modal sizing, ladder ≥1600 / 1280–1599 /
+  1024–1279 / 768–1023 / <768, then `qa/baselines/` recaptured. *Done when:*
+  no horizontal overflow or clipped control at 2560/1920/1600/1440/1366/
+  1280/1024/768 × 720/800/1080.
+
+Deferred (explicitly out of scope): `llama catalog --json` alignment,
+autostart, multi-remote servers, parameter tuning, image input in chat
+(vision guides get `(text chat)` chips; vision *input* is a separate
 product decision).
 
 ---

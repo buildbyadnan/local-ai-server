@@ -256,8 +256,10 @@ out of `//...`), and CI lints, tests and builds it alongside the Cargo matrix.
 **Want to run it? You need two free installs and four commands — no AI
 knowledge required, and nothing you type leaves your machine.**
 
-1. **[Node.js 20+](https://nodejs.org)** — install the *LTS* version, then
-   run `corepack enable` once in a terminal so the `pnpm` command works.
+1. **[Node.js 22.23.4+](https://nodejs.org)** — install the *LTS* version (24
+   LTS is fine; don't use anything older than 22.23.4 — it has a known security
+   hole), then run `corepack enable` once in a terminal so the `pnpm` command
+   works.
 2. **[Ollama](https://ollama.com/download)** — the free local AI server.
    Install it and start it (open the app; on Linux run `ollama serve`).
 
