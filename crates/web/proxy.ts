@@ -2,8 +2,7 @@ import { NextResponse, type NextRequest } from "next/server";
 import { allModels } from "@/data/models";
 
 /** The one shape the API accepts — anything else is refused here, before a
- *  route handler ever touches the body (CONNECTIVITY_PLAN §3.3: guards run
- *  first, body second). */
+ *  route handler ever touches the body: guards run first, body second. */
 function rejectEncoding(): NextResponse {
   return NextResponse.json(
     { error: "Compressed request bodies are not accepted." },

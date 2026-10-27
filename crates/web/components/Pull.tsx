@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * Pull flow (CONNECTIVITY_PLAN §5.4): the inline confirm in a tree row, the
+ * Pull flow: the inline confirm in a tree row, the
  * global progress row, the terminal note on the row that owns the pull, and
  * the no-models starter CTA (§8's quoted sentence) used by both the chat's
  * empty state and the picker's empty state.

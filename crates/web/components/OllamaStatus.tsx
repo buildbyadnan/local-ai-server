@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The sidebar's OLLAMA section (CONNECTIVITY_PLAN §5.1 / §9 M5): a
+ * The sidebar's OLLAMA section (M5): a
  * collapsed header row with a dot+word status pill, expanding into
  * state-driven actions —
  *
@@ -293,7 +293,10 @@ export default function OllamaStatus() {
         aria-expanded={open}
         onClick={() => setOpen((v) => !v)}
       >
-        OLLAMA
+        {/* M11 raised .histbtn to 12.5px: at the 768px tier the sidebar is
+            150px, so the label must be allowed to truncate instead of
+            shoving the status pill past the panel (2px horizontal scroll). */}
+        <span className="hlabel">OLLAMA</span>
         <span className="obar">
           <span className={`pill pill-${state}`} aria-live="polite">
             <i aria-hidden="true" />

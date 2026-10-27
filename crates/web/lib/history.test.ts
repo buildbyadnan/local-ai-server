@@ -5,6 +5,7 @@ import {
   capSessions,
   filterSessions,
   mergeSessions,
+  sanitizeSessions,
   titleFrom,
   type ChatSession,
 } from "@/lib/history";
@@ -105,5 +106,45 @@ describe("mergeSessions (row 19 union)", () => {
     const t1 = { ...session("zzz", base, 1), title: "t1" };
     const t2 = { ...session("aaa", base, 1), title: "t2" };
     expect(mergeSessions([t1], [t2])[0].id).toBe("zzz"); // greater id wins
+  });
+});
+
+describe("sanitizeSessions — per-message model stamp (M11)", () => {
+  const row = {
+    id: "ses_m",
+    title: "t",
+    model: "llama3.2:latest",
+    created_at: "2026-10-27T10:00:00Z",
+    updated_at: "2026-10-27T10:00:00Z",
+    messages: [
+      { role: "user", content: "hi", at: "2026-10-27T10:00:00Z", model: "llama3.2:latest" },
+      { role: "assistant", content: "yo", at: "2026-10-27T10:00:01Z", model: "llama3.1:8b" },
+    ],
+  };
+
+  it("keeps a valid stamp on each message", () => {
+    const [s] = sanitizeSessions([row]) ?? [];
+    expect(s?.messages[0].model).toBe("llama3.2:latest");
+    expect(s?.messages[1].model).toBe("llama3.1:8b");
+  });
+
+  it("keeps pre-M11 rows without a stamp (no model field)", () => {
+    const legacy = { ...row, messages: [{ role: "assistant", content: "old", at: row.created_at }] };
+    const [s] = sanitizeSessions([legacy]) ?? [];
+    expect(s).toBeTruthy();
+    expect(s?.messages[0].model).toBeUndefined();
+  });
+
+  it("drops junk stamps but keeps the message", () => {
+    const junk = { ...row, messages: [{ role: "user", content: "hi", at: row.created_at, model: 42 }] };
+    const [s] = sanitizeSessions([junk]) ?? [];
+    expect(s?.messages[0].content).toBe("hi");
+    expect(s?.messages[0].model).toBeUndefined();
+  });
+
+  it("bounds an oversize stamp", () => {
+    const big = { ...row, messages: [{ role: "user", content: "hi", at: row.created_at, model: "x".repeat(500) }] };
+    const [s] = sanitizeSessions([big]) ?? [];
+    expect(s?.messages[0].model).toBeUndefined();
   });
 });

@@ -3,7 +3,7 @@ import { isValidTag } from "@/lib/ollama";
 
 /**
  * Tag validation is the only thing standing between a request body and the
- * upstream JSON we build (CONNECTIVITY_PLAN §3.2): the shape must be a
+ * upstream JSON we build: the shape must be a
  * lowercase Ollama registry tag, never a path or a content-injection
  * attempt. Rule: `^[a-z0-9][a-z0-9._/-]{0,127}(?::[a-z0-9._-]{1,64})?$`.
  */

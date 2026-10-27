@@ -1,7 +1,7 @@
 /**
  * GET /api/ollama/status — live snapshot of this machine's Ollama.
  *
- * Request-time by construction (CONNECTIVITY_PLAN §3.3): the Host guard
+ * Request-time by construction: the Host guard
  * reads `request.headers` first, which stops any prerender, and every
  * network/probe call below is caught — a rejection here would take the
  * route down at runtime (and, if reordered ahead of the guard, fail the

@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The one dialog shell for the whole app (CONNECTIVITY_PLAN §9 M5):
+ * The one dialog shell for the whole app (M5):
  * backdrop, title bar, focus trap, Escape, backdrop-click close, scroll
  * lock and focus restoration — so every modal behaves identically for
  * keyboard and mouse users.

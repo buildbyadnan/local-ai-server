@@ -223,3 +223,43 @@ describe("historyStats", () => {
     expect(stats.file).toContain("history.db");
   });
 });
+
+describe("per-message model stamp (M11)", () => {
+  it("round-trips a valid stamp through save + list", () => {
+    const saved = db.saveSession({
+      id: "ses_stamp",
+      model: "llama3.2:latest",
+      messages: [
+        { role: "user", content: "hi", at: "2026-01-01T00:00:00.000Z", model: "llama3.2:latest" },
+        { role: "assistant", content: "hello", at: "2026-01-01T00:00:01.000Z", model: "llama3.1:8b" },
+      ],
+    });
+    expect(saved.messages[0].model).toBe("llama3.2:latest");
+    expect(saved.messages[1].model).toBe("llama3.1:8b");
+    expect(db.listSessions()[0].messages[1].model).toBe("llama3.1:8b");
+  });
+
+  it("accepts rows with no stamp (pre-M11) unchanged", () => {
+    const saved = db.saveSession({
+      id: "ses_legacy",
+      model: "llama3.1:8b",
+      messages: [msg("old")],
+    });
+    expect(saved.messages[0].model).toBeUndefined();
+  });
+
+  it("drops a junk stamp instead of rejecting the message", () => {
+    const saved = db.saveSession({
+      id: "ses_junk_stamp",
+      model: "llama3.1:8b",
+      messages: [
+        { role: "user", content: "hi", at: "2026-01-01T00:00:00.000Z", model: 7 as unknown as string },
+        { role: "assistant", content: "ok", at: "2026-01-01T00:00:01.000Z", model: "m".repeat(400) },
+      ],
+    });
+    expect(saved.messages).toHaveLength(2);
+    expect(saved.messages[0].model).toBeUndefined();
+    expect(saved.messages[1].model).toBeUndefined();
+    expect(saved.messages[1].content).toBe("ok");
+  });
+});

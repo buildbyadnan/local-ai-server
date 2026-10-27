@@ -1,5 +1,5 @@
 /**
- * Server-side chat history (CONNECTIVITY_PLAN §9 M7): one SQLite file via
+ * Server-side chat history (M7): one SQLite file via
  * `node:sqlite` — zero new dependencies, a single self-contained file that
  * every Chrome profile on this machine talks to through the API.
  *
@@ -78,12 +78,23 @@ function parseMessage(raw: unknown): ChatMessage | null {
   const m = raw as Record<string, unknown>;
   if (m.role !== "user" && m.role !== "assistant") return null;
   if (typeof m.content !== "string" || typeof m.at !== "string") return null;
+  // M11: optional per-message model stamp — bounded, junk dropped, never a
+  // reason to reject the message (pre-M11 rows simply have no stamp).
+  const model =
+    typeof m.model === "string" && m.model.length > 0 && m.model.length <= 200
+      ? m.model
+      : undefined;
   if (m.content.length > 1_000_000) {
     // Truncate, never reject: a runaway generation must not cost the user
     // the rest of the conversation (1M chars ≈ 2 MB, far past any reply).
-    return { role: m.role, content: m.content.slice(0, 1_000_000), at: m.at.slice(0, 64) };
+    return {
+      role: m.role,
+      content: m.content.slice(0, 1_000_000),
+      at: m.at.slice(0, 64),
+      model,
+    };
   }
-  return { role: m.role, content: m.content, at: m.at.slice(0, 64) };
+  return { role: m.role, content: m.content, at: m.at.slice(0, 64), model };
 }
 
 /** Valid `ses_*`-style id: our charset, bounded length (no path/SQL junk). */

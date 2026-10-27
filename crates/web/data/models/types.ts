@@ -32,8 +32,8 @@ export interface ModelGuide {
   sizeLabel: string;
   contextLabel: string;
   /**
-   * Exact `ollama pull` tag when this guide maps to a registry model
-   * (CONNECTIVITY_PLAN §6). Guides without it are guide-only — never a
+   * Exact `ollama pull` tag when this guide maps to a registry model.
+   * Guides without it are guide-only — never a
    * chip, never a Pull button.
    */
   ollamaTag?: string;

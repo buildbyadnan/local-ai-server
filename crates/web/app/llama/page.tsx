@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Footer from "@/components/Footer";
 import { allModels, modelsInTier, tiers } from "@/data/models";
 
 export const metadata: Metadata = {
@@ -57,6 +58,7 @@ export default function LlamaDirectory() {
           );
         })}
       </div>
+      <Footer />
     </div>
   );
 }

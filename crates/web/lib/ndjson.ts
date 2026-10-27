@@ -5,7 +5,7 @@
  * sometimes mid-UTF-8-character — so decoding happens outside (TextDecoder
  * in stream mode) and buffering happens here. Everything in this module is
  * synchronous and side-effect free, which is what makes the reader's edge
- * cases unit-testable (CONNECTIVITY_PLAN §10.3).
+ * cases unit-testable.
  */
 
 export interface FedChunk {

@@ -3,7 +3,7 @@
  *
  * Guards → byte cap → shape validation → upstream fetch with
  * `request.signal` wired through, so the browser's Stop/navigation abort
- * reaches Ollama and stops generation (CONNECTIVITY_PLAN §3.4/§3.5).
+ * reaches Ollama and stops generation.
  * Ollama's own `{"error"}` lines arrive on HTTP 200 and flow through
  * untouched; transport failures map to 503/502 before streaming starts.
  */

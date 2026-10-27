@@ -1,7 +1,7 @@
 /**
  * POST /api/ollama/rm — delete one installed model, allowlisted.
  *
- * The only destructive command the app may run (CONNECTIVITY_PLAN §9 M5):
+ * The only destructive command the app may run (M5):
  * `ollama rm <tag>` via execFile with a tag that already passed the
  * registry-tag regex — no shell, no interpolation, no free-form input.
  * Guard order §3.3: Host → Origin → body → tag validation → exec.

@@ -8,7 +8,7 @@ interface Line {
 }
 
 /**
- * The chat reader's edge cases (CONNECTIVITY_PLAN §10.3): chunk boundaries
+ * The chat reader's edge cases: chunk boundaries
  * are arbitrary, CRLF and blank lines happen, a damaged line must never
  * break the stream, and multibyte characters can straddle two chunks — the
  * last one together with TextDecoder's stream mode, which is how the real

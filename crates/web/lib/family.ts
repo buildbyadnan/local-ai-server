@@ -1,7 +1,7 @@
 /**
  * Which installed models this app will let you chat with.
  *
- * The product is a *Llama* companion (CONNECTIVITY_PLAN §9 M6): the
+ * The product is a *Llama* companion (M6): the
  * guides, the pull buttons and the recommended defaults are all Llama
  * family, so a stray `gemma4:12b` on the machine must never appear in the
  * chat picker — while remaining visible (and deletable) under OLLAMA,

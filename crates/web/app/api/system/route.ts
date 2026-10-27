@@ -1,6 +1,6 @@
 /**
  * GET /api/system — a fresh snapshot for the System-info dialog
- * (CONNECTIVITY_PLAN §9 M5).
+ * (M5).
  *
  * Request-time by construction (§3.3): the Host guard reads
  * `request.headers` first, so no prerender can ever run the collectors,

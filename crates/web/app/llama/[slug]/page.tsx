@@ -1,5 +1,6 @@
 import type { Metadata } from "next";
 import Link from "next/link";
+import Footer from "@/components/Footer";
 import { notFound } from "next/navigation";
 import { allModels, getModel, modelsInTier, tiers } from "@/data/models";
 
@@ -203,6 +204,7 @@ export default async function ModelPage({ params }: PageProps) {
           </div>
         </div>
       </article>
+      <Footer />
     </div>
   );
 }

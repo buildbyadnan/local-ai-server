@@ -21,8 +21,9 @@
   --bub: #2a2d2a;
   --y: #d9e84a;
   --bad: #e08a7f;
-  /* screen gutter — slim so the app can fill the viewport */
-  --gut: clamp(10px, 1.4vw, 18px);
+  /* M11: height of the credit bar (11px/1.45 text + 7px padding + hairline),
+     reused as the sticky composer's offset on stacked layouts. */
+  --foot-h: calc(31px + env(safe-area-inset-bottom, 0px));
 }
 @media (prefers-color-scheme: dark) {
   :root:not([data-theme="light"]) {
@@ -93,9 +94,9 @@ body {
   color: var(--tx);
   display: flex;
   flex-direction: column;
-  padding: var(--gut);
-  padding-top: calc(var(--gut) + env(safe-area-inset-top, 0px));
-  padding-bottom: calc(var(--gut) + env(safe-area-inset-bottom, 0px));
+  /* M10: edge-to-edge — the shell owns the whole viewport, so the body
+     carries no gutter (safe-area insets move onto the footer bar). */
+  padding: 0;
   min-height: 100vh;
   min-height: 100dvh;
 }
@@ -119,63 +120,102 @@ a:focus-visible {
    App shell — 3 columns: sidebar / center / AI module
    --------------------------------------------------------------- */
 .app {
-  /* M9: the shell is fluid but capped — a 1000 px box wasted a 1440+ screen
-     and a fully uncapped one turns a 2560 screen into unreadable line
-     lengths. `min(1680px, 100%)` gives every desktop width the same roomy
-     shell, centered, and stays 100% on small viewports. */
-  width: min(1680px, 100%);
-  margin: 0 auto;
+  /* M10: edge-to-edge. The M9 cap (min(1680px, 100%)) and the centered,
+     rounded, shadowed frame are gone — the sections cover the viewport's
+     full length and breadth, and the grid's last row is the always-visible
+     credit footer. */
+  width: 100%;
   background: var(--bg);
-  border-radius: 26px;
-  padding: 10px;
   display: grid;
   grid-template-columns: 160px minmax(0, 1fr) 190px;
-  grid-template-rows: minmax(0, 1fr);
-  gap: 10px;
-  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.35);
+  grid-template-rows: minmax(0, 1fr) auto;
+  gap: 0;
 }
-/* Desktop (≥768px): fill the viewport height — full height, slim gutter. */
+/* Desktop (≥768px): exactly one viewport tall — panels scroll inside. */
 @media (min-width: 768px) {
   .app {
-    height: calc(
-      100dvh - 2 * var(--gut) - env(safe-area-inset-top, 0px) -
-        env(safe-area-inset-bottom, 0px)
-    );
+    height: 100dvh;
   }
 }
-/* M9 ladder (clamp tracks, no fixed px jumps between nearby widths):
-   768–1023 narrow · 1024–1279 compact · 1280–1599 default · ≥1600 roomy. */
+/* M10 ladder for full-bleed: side tracks scale with the screen, the chat
+   column absorbs the rest. 768–1023 narrow · 1024–1279 compact ·
+   1280–1599 default · ≥1600 roomy. */
 @media (min-width: 768px) and (max-width: 1023px) {
   .app {
-    grid-template-columns: clamp(150px, 17vw, 196px) minmax(0, 1fr)
-      clamp(168px, 20vw, 224px);
-    gap: 8px;
+    grid-template-columns: clamp(150px, 17vw, 200px) minmax(0, 1fr)
+      clamp(172px, 21vw, 232px);
   }
 }
 @media (min-width: 1024px) and (max-width: 1279px) {
   .app {
-    grid-template-columns: clamp(200px, 17vw, 232px) minmax(0, 1fr)
-      clamp(216px, 20vw, 256px);
+    grid-template-columns: clamp(212px, 17vw, 244px) minmax(0, 1fr)
+      clamp(224px, 21vw, 276px);
   }
 }
 @media (min-width: 1280px) and (max-width: 1599px) {
   .app {
-    grid-template-columns: 280px minmax(0, 1fr) 340px;
+    grid-template-columns: 300px minmax(0, 1fr) 360px;
   }
 }
 @media (min-width: 1600px) {
   .app {
-    grid-template-columns: clamp(300px, 19vw, 348px) minmax(0, 1fr)
-      clamp(344px, 22vw, 400px);
-    gap: 14px;
+    grid-template-columns: clamp(320px, 19vw, 384px) minmax(0, 1fr)
+      clamp(364px, 22vw, 448px);
   }
 }
+/* ---------------------------------------------------------------
+   Credit footer — always the last, bottom-most row of the shell
+   --------------------------------------------------------------- */
+.foot {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 12px;
+  padding-bottom: calc(7px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid var(--line);
+  background: var(--bg);
+  color: var(--dim);
+  font-size: 11px;
+  letter-spacing: 0.02em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  /* Outside the grid (directory/guide pages) this pins the bar to the
+     bottom of the viewport when the page content is short, and sticks to
+     the viewport bottom while a long page scrolls — always the bottom-most
+     thing on screen, ending the document at its natural place. */
+  margin-top: auto;
+}
+.dwrap .foot {
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+}
+.foot a {
+  color: var(--mut);
+  text-decoration: none;
+}
+.foot a:hover {
+  color: var(--g);
+  text-decoration: underline;
+}
+.foot a:focus-visible {
+  outline-offset: 1px;
+}
+
 .panel {
   background: linear-gradient(180deg, #121412, #0a0c0a);
-  border: 1px solid var(--line);
-  border-radius: 16px;
+  border: none;
+  border-radius: 0;
   padding: 12px;
   min-height: 0;
+  /* M11: grid items default to `min-width: auto`, so a nowrap child (the
+     history titles) could inflate a track past the viewport — 473px at
+     375px wide with the history panel open. Panels may shrink to 0; their
+     contents clip instead of widening the page. */
+  min-width: 0;
 }
 
 /* ---------------- left: sidebar ---------------- */
@@ -186,6 +226,10 @@ a:focus-visible {
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #2a2d2a transparent;
+  /* M10: with gap:0 the panels meet edge-to-edge — a single hairline is
+     the separator (below 768px they stack, so it becomes a horizontal
+     rule instead — see the ≤767 media block). */
+  border-right: 1px solid var(--line);
 }
 .side > * {
   flex: none;
@@ -243,7 +287,7 @@ a:focus-visible {
 }
 .lbl {
   color: var(--dim);
-  font-size: 9.5px;
+  font-size: 10.5px;
   letter-spacing: 0.06em;
   margin: 4px 0 0;
 }
@@ -259,7 +303,7 @@ a:focus-visible {
   padding: 6px 4px;
   border-radius: 8px;
   color: var(--dim);
-  font-size: 11.5px;
+  font-size: 12.5px;
 }
 .nav .item.on {
   color: var(--tx);
@@ -293,7 +337,7 @@ a.nav .item,
   border: 1px solid var(--line);
   background: #161916;
   color: var(--tx);
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 500;
   text-align: left;
 }
@@ -306,6 +350,16 @@ a.nav .item,
   background: #0f2a14;
   color: var(--g);
 }
+.histbtn .hlabel {
+  /* shrinkable label: ellipsis beats a 2px horizontal scrollbar */
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.histbtn .obar {
+  flex: none; /* the pill + chevron never shrink — the label gives way */
+}
 .histbtn .chev {
   color: var(--mut);
   font-size: 9px;
@@ -315,14 +369,14 @@ a.nav .item,
 }
 .histnote {
   color: var(--dim);
-  font-size: 9.5px;
+  font-size: 11px;
   margin-top: 6px;
   line-height: 1.5;
 }
 .saveerr {
   margin-top: 6px;
   color: var(--y);
-  font-size: 9.5px;
+  font-size: 11px;
   line-height: 1.5;
 }
 /* Session list (M7): searchable cards with a per-row delete — the raw
@@ -349,7 +403,7 @@ a.nav .item,
   border-radius: 9px;
   background: #161916;
   color: var(--tx);
-  font-size: 11px;
+  font-size: 12px;
 }
 .histrow:hover {
   border-color: #2e8a3d;
@@ -448,15 +502,18 @@ a.nav .item,
   outline-offset: 1px;
 }
 .histrow .htitle {
+  min-width: 0;
   overflow: hidden;
   font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
+  text-overflow: ellipsis;
 }
 .histrow .hmeta {
+  min-width: 0;
   overflow: hidden;
   color: var(--dim);
-  font-size: 9.5px;
+  font-size: 10.5px;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
@@ -611,7 +668,7 @@ a.nav .item,
 }
 .oremove {
   color: var(--y);
-  font-size: 9.5px;
+  font-size: 12px;
   line-height: 1.5;
 }
 
@@ -860,7 +917,7 @@ a.nav .item,
 .sysnote {
   margin: 6px 0 0;
   color: var(--dim);
-  font-size: 9.5px;
+  font-size: 11px;
   line-height: 1.55;
 }
 .syserror {
@@ -876,9 +933,9 @@ a.nav .item,
 .main {
   display: flex;
   flex-direction: column;
-  min-width: 0;
+  min-width: 0; /* grid item may shrink; contents clip (see .panel) */
   min-height: 0;
-  padding: 6px 4px 0;
+  padding: 10px;
 }
 .main h1 {
   font-size: 15px;
@@ -887,7 +944,7 @@ a.nav .item,
 }
 .main > p {
   color: var(--mut);
-  font-size: 11px;
+  font-size: 12.5px;
   margin-bottom: 14px;
 }
 .chat {
@@ -928,18 +985,89 @@ a.nav .item,
   background: linear-gradient(180deg, #343834, #232623);
   border: 1px solid var(--line);
   border-radius: 12px;
-  padding: 12px 13px;
-  font-size: 11px;
-  line-height: 1.6;
-  max-width: min(420px, 92%);
+  padding: 14px 16px;
+  /* M11 — readable: 14px text, 1.65 leading, ~74ch measure, and the
+     line breaks a model emits are preserved (pre-wrap) with long unbroken
+     tokens wrapping instead of overflowing the bubble. */
+  font-size: 14px;
+  line-height: 1.65;
+  max-width: min(74ch, 94%);
   position: relative;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
 }
 .bub.me {
   align-self: flex-end;
 }
+/* M11 — a reply is markdown: fenced blocks render as code, not backticks. */
+.bub .cblk {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+  font-size: 13px;
+  line-height: 1.55;
+  color: #d7e7d9;
+  background: #0d100d;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 9px 11px;
+  margin: 7px 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.bub .ci {
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo,
+    monospace;
+  font-size: 0.93em;
+  background: rgba(255, 255, 255, 0.07);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  padding: 0 4px;
+}
+/* ## headings, --- rules and - lists become structure, not literal noise */
+.bub .chd {
+  display: block;
+  font-weight: 600;
+  color: var(--tx);
+  line-height: 1.4;
+  margin: 8px 0 3px;
+}
+.bub .chd[data-level="1"] {
+  font-size: 16px;
+}
+.bub .chd[data-level="2"] {
+  font-size: 15px;
+}
+.bub .chd[data-level="3"] {
+  font-size: 14.5px;
+}
+.bub .chd[data-level="4"],
+.bub .chd[data-level="5"],
+.bub .chd[data-level="6"] {
+  font-size: 14px;
+}
+.bub .crule {
+  display: block;
+  border: 0;
+  border-top: 1px solid var(--line);
+  margin: 9px 0;
+}
+.bub .clist {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  margin: 4px 0;
+  padding-left: 20px;
+}
+.bub .clist li {
+  list-style: disc;
+}
+.bub strong {
+  font-weight: 600;
+  color: var(--tx);
+}
 .bub .who {
   display: block;
-  font-size: 9px;
+  font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--mut);
@@ -970,11 +1098,11 @@ a.nav .item,
 }
 .empty b {
   color: var(--tx);
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 500;
 }
 .empty p {
-  font-size: 10.5px;
+  font-size: 12px;
   max-width: 38ch;
   line-height: 1.6;
 }
@@ -999,7 +1127,7 @@ a.nav .item,
   border: 0;
   color: var(--tx);
   font: inherit;
-  font-size: 11px;
+  font-size: 14px; /* M11: matches the bubble text you are answering */
   outline: 0;
   padding: 8px 2px;
 }
@@ -1046,7 +1174,7 @@ a.nav .item,
   border-radius: 10px;
   background: #1c1a0c;
   color: var(--y);
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1.5;
   text-align: left;
 }
@@ -1060,7 +1188,7 @@ a.nav .item,
 .warm {
   margin: 0;
   color: var(--y);
-  font-size: 10.5px;
+  font-size: 12px;
 }
 .errbox {
   display: flex;
@@ -1074,7 +1202,7 @@ a.nav .item,
 .errbox p {
   margin: 0;
   color: var(--bad);
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1.5;
 }
 .erracts {
@@ -1084,7 +1212,7 @@ a.nav .item,
 .note {
   text-align: center;
   color: var(--dim);
-  font-size: 8.5px;
+  font-size: 11px;
   position: relative;
   z-index: 1;
 }
@@ -1098,6 +1226,7 @@ a.nav .item,
   overflow-y: auto;
   scrollbar-width: thin;
   scrollbar-color: #2a2d2a transparent;
+  border-left: 1px solid var(--line); /* M10: hairline separator, see .side */
 }
 .rp h2 {
   font-size: 13px;
@@ -1222,7 +1351,7 @@ a.nav .item,
   position: relative;
   width: 100%;
   text-align: left;
-  font-size: 10.5px;
+  font-size: 11.5px;
 }
 .tree .f::before {
   content: "";
@@ -1412,7 +1541,7 @@ button.tname:focus-visible,
 .pullnote {
   margin: 0;
   color: var(--mut);
-  font-size: 10.5px;
+  font-size: 12px;
   line-height: 1.55;
 }
 .pullnote.bad {
@@ -1472,32 +1601,44 @@ button.tname:focus-visible,
   .rp {
     grid-column: 1 / -1;
     overflow: visible;
+    border-left: none;
+    border-top: 1px solid var(--line);
   }
   .side {
     overflow: visible;
+    border-right: 1px solid var(--line);
   }
   .chat {
     min-height: 480px;
   }
 }
 @media (max-width: 620px) {
-  body {
-    padding: 6px;
-    padding-top: calc(6px + env(safe-area-inset-top, 0px));
-    padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
-  }
   .app {
-    grid-template-columns: 1fr;
-    border-radius: 20px;
+    grid-template-columns: minmax(0, 1fr); /* no auto min — see .panel */
   }
   .side {
     order: 1;
+    border-right: none;
+    border-bottom: 1px solid var(--line);
   }
   .main {
     order: 0;
+    /* M11 mobile: the chat owns exactly one screen (minus the credit bar),
+       so messages scroll inside it and the composer is always reachable —
+       the sidebar and AI module continue below in the document. */
+    height: calc(100dvh - var(--foot-h));
+    min-height: 0;
   }
   .rp {
     order: 2;
+  }
+  /* Credit bar: last in source order AND pinned to the viewport bottom, so
+     it is bottom-most on screen even while the sections below scroll. */
+  .foot {
+    order: 3;
+    position: sticky;
+    bottom: 0;
+    z-index: 6;
   }
   .chat {
     min-height: 380px;
@@ -1545,7 +1686,7 @@ button.tname:focus-visible,
     min-height: 160px;
   }
   .bub {
-    font-size: 12.5px;
+    font-size: 14px; /* M11: mobile reads at the same size as desktop */
     max-width: 100%;
   }
   .empty b {
@@ -1555,7 +1696,7 @@ button.tname:focus-visible,
     font-size: 12px;
   }
   .in input {
-    font-size: 13px;
+    font-size: 14px;
     padding: 10px 2px;
   }
   .note {
@@ -1614,15 +1755,20 @@ button.tname:focus-visible,
    /llama — directory index + model detail pages
    --------------------------------------------------------------- */
 .dwrap {
-  max-width: 960px;
-  margin: 0 auto;
+  /* M10: full-bleed — the directory and guide cover the whole width
+     instead of a centered 960px island. Prose keeps its own measure
+     (.dtag, .dsec p are 64ch-capped), only panels/grids stretch. As a
+     flex column it can pin the credit footer to the viewport bottom. */
+  width: 100%;
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
 }
 .dpanel {
   background: linear-gradient(180deg, #121412, #0a0c0a);
-  border: 1px solid var(--line);
-  border-radius: 26px;
-  padding: 26px 28px 30px;
-  box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.35);
+  border: none;
+  border-radius: 0;
+  padding: 26px 32px 40px;
 }
 .dnav {
   display: flex;

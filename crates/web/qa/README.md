@@ -1,6 +1,6 @@
 # QA — visual references
 
-Reference screenshots for the Web UI, per `CONNECTIVITY_PLAN.md` §10.6.2.
+Reference screenshots for the Web UI baseline suite.
 Nothing here runs in CI (CI has no browser, and §10.3 forbids an e2e runner):
 capturing and diffing are explicit, local, human steps.
 

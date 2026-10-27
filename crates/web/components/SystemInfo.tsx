@@ -1,7 +1,7 @@
 "use client";
 
 /**
- * The SYSTEM INFO row (CONNECTIVITY_PLAN §9 M5) — sits directly above
+ * The SYSTEM INFO row (M5) — sits directly above
  * OLLAMA in the sidebar and opens a dialog with everything this machine
  * can honestly report: OS, CPU, memory, disk, Ollama, and the runtime
  * this server is running on.

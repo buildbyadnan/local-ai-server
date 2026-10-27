@@ -5,8 +5,8 @@
  * the environment (same convention as the `llama` CLI), the upstream paths
  * are fixed, and every request is guarded before it can touch Ollama.
  *
- * The guards are the product's security boundary (see CONNECTIVITY_PLAN
- * §3.2/§4.4): the server binds loopback only, the Host guard rejects
+ * The guards are the product's security boundary: the server binds
+ * loopback only, the Host guard rejects
  * DNS-rebinding traffic, and the body cap bounds memory in a tool with no
  * auth. They are guard rails, not a multi-tenant security model.
  */
@@ -181,8 +181,7 @@ interface Candidate {
 /**
  * Candidate binaries. `OLLAMA_BIN_PATHS` (comma-separated) overrides the
  * list — an empty value forces "not installed". That override exists so the
- * not-installed UI state is testable on a machine that has Ollama (QA only;
- * see CONNECTIVITY_PLAN §10.5).
+ * not-installed UI state is testable on a machine that has Ollama (QA only).
  */
 function candidates(): Candidate[] {
   const override = process.env.OLLAMA_BIN_PATHS;

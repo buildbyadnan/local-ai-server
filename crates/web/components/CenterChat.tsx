@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useOllama } from "@/components/ModelProvider";
+import ChatText from "@/components/ChatText";
 import { StarterCta } from "@/components/Pull";
 import {
   historyStore,
@@ -19,6 +20,10 @@ interface Bubble {
   failed?: boolean;
   /** Reply the user cut short with Stop — real text, shown as "stopped". */
   stopped?: boolean;
+  /** M11 — the model that produced this line (stamped at write time);
+   *  absent only on pre-M11 seeded messages, which fall back to the
+   *  session's model. */
+  model?: string;
 }
 
 /** One NDJSON line from POST /api/ollama/chat (Ollama's streaming contract). */
@@ -49,7 +54,7 @@ function isOverflow(text: string): boolean {
 
 /**
  * The chat pane's inner view: it owns the conversation and the streaming
- * pipeline (CONNECTIVITY_PLAN §5.3): guarded send, split-safe NDJSON
+ * pipeline: guarded send, split-safe NDJSON
  * parsing via `lib/ndjson`, Stop via AbortController, warm-up line, and the
  * honest error states from the §7 matrix. The provider only carries the
  * coordination flags (streaming, chat-empty, an active pull) so other
@@ -82,6 +87,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
       role: m.role,
       text: m.content,
       at: m.at,
+      model: m.model,
     })),
   );
   /** Mirror of `messages` so async stream callbacks read the live list. */
@@ -137,6 +143,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
         role: m.role,
         content: m.text,
         at: m.at,
+        model: m.model,
       })),
     });
   }
@@ -162,7 +169,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages]);
 
-  function append(content: string) {
+  function append(content: string, model: string | null) {
     const prev = messagesRef.current;
     const last = prev[prev.length - 1];
     if (last && last.role === "assistant") {
@@ -174,7 +181,12 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
     }
     apply([
       ...prev,
-      { role: "assistant", text: content, at: new Date().toISOString() },
+      {
+        role: "assistant",
+        text: content,
+        at: new Date().toISOString(),
+        model: model ?? undefined,
+      },
     ]);
   }
 
@@ -182,6 +194,10 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
     const controller = new AbortController();
     abortRef.current = controller;
     payloadRef.current = payload;
+    // M11: the model named in the request is the model this reply is
+    // stamped with — captured once, so a mid-stream picker change can't
+    // mislabel the message.
+    const answering = selected;
     setStreaming(true);
     setError(null);
     const warm = selected !== null && !(status?.loaded ?? []).includes(selected);
@@ -229,7 +245,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
         window.clearTimeout(queueTimer);
         setQueued(false);
         setWarming(false);
-        append(content);
+        append(content, answering);
       }
     };
 
@@ -310,7 +326,12 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
     ];
     apply([
       ...messagesRef.current,
-      { role: "user", text, at: new Date().toISOString() },
+      {
+        role: "user",
+        text,
+        at: new Date().toISOString(),
+        model: selected ?? undefined,
+      },
     ]);
     setDraft("");
     persist(); // §5.5(a) — the first send creates the session
@@ -401,9 +422,10 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
                 <span className="who">
                   {m.role === "user"
                     ? "You"
-                    : `${seed?.model ?? selected ?? "model"}${m.stopped ? " · stopped" : ""}`}
+                    : `${m.model ?? seed?.model ?? selected ?? "model"}${m.stopped ? " · stopped" : ""}`}
                 </span>
-                {m.text}
+                {/* M11: code fences/bold/inline code render as real elements */}
+                <ChatText text={m.text} />
               </div>
             ))}
           </div>

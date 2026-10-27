@@ -2,7 +2,7 @@
  * The only operations this app ever performs against the Ollama
  * installation — and the only child processes it may start.
  *
- * Rules (CONNECTIVITY_PLAN §4.4 / decisions):
+ * Rules:
  *  - allowlisted argv only: a fixed subcommand plus a tag that already
  *    passed `isValidTag`, executed with `execFile` (no shell, no string
  *    interpolation, no PATH guessing beyond the same candidate list the

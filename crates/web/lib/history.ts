@@ -1,5 +1,5 @@
 /**
- * Chat history (CONNECTIVITY_PLAN §5.5, reworked by §9 M7).
+ * Chat history (M7).
  *
  * Two halves, both pure enough to unit-test:
  * - the **types + helpers** the UI shares (`titleFrom`, `filterSessions`,
@@ -37,6 +37,11 @@ export interface ChatMessage {
   content: string;
   /** ISO timestamp stamped when the message is written (§5.5 write point b). */
   at: string;
+  /**
+   * M11 — the model this message was produced under (stamped at write
+   * time). Absent on pre-M11 rows; consumers fall back to `session.model`.
+   */
+  model?: string;
 }
 
 export interface ChatSession {
@@ -170,7 +175,11 @@ export function sanitizeSessions(raw: unknown): ChatSession[] | null {
       ) {
         return null;
       }
-      messages.push({ role: m.role, content: m.content, at: m.at });
+      const model =
+        typeof m.model === "string" && m.model.length > 0 && m.model.length <= 200
+          ? m.model
+          : undefined;
+      messages.push({ role: m.role, content: m.content, at: m.at, model });
     }
     const created_at = e.created_at;
     const updated_at = typeof e.updated_at === "string" ? e.updated_at : created_at;

@@ -1,5 +1,5 @@
 /**
- * Installed-model ↔ guide matching (CONNECTIVITY_PLAN §6) — a faithful
+ * Installed-model ↔ guide matching — a faithful
  * adaptation of the llama CLI's `catalog_entry_for` (catalog.rs:206-229),
  * family constraint included:
  *

@@ -8,7 +8,7 @@
  * query, the quota notice). Sidebar, AiModule and CenterChat are consumers
  * only — no prop drilling through the server page.
  *
- * Re-render discipline (CONNECTIVITY_PLAN §11.3): the context value is
+ * Re-render discipline: the context value is
  * memoized, and a fresh status snapshot is committed **only when it differs
  * by value** — an unchanged 5 s poll causes zero re-renders. Conversation
  * text itself stays inside CenterChat so per-token updates never re-render
