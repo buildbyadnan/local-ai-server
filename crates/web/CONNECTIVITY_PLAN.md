@@ -1001,7 +1001,17 @@ Voice check at M4: the section must read like `llama`'s guided recommender
   independently scrolling panels, modal sizing, ladder ≥1600 / 1280–1599 /
   1024–1279 / 768–1023 / <768, then `qa/baselines/` recaptured. *Done when:*
   no horizontal overflow or clipped control at 2560/1920/1600/1440/1366/
-  1280/1024/768 × 720/800/1080.
+  1280/1024/768 × 720/800/1080. *Shipped as:* `.app { width: min(1680px,
+  100%) }` centered, the four ladder tiers with `clamp()` tracks, the
+  two-column breakpoint moved 860 → 767px so 768–1023 keeps all three
+  columns, `.modal { width: min(720px, 92vw) }` (720 reads, 92vw can't
+  reach the backdrop's 24px gutter), and a ≤1023px tightening of
+  `.histbtn`/`.obar` — the OLLAMA badge overflowed the 150px sidebar by
+  6px at every width where that column is 150px (a pre-existing bug the
+  matrix caught). *Measured:* 24/24 viewport combos with zero horizontal
+  overflow, brand/picker/composer/Send all inside the viewport, `.side`/
+  `.main`/`.rp` scrolling vertically only; the System info dialog fits
+  768/1024/1920 with `scrollWidth == clientWidth`.
 
 Deferred (explicitly out of scope): `llama catalog --json` alignment,
 autostart, multi-remote servers, parameter tuning, image input in chat

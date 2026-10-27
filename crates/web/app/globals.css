@@ -119,7 +119,11 @@ a:focus-visible {
    App shell — 3 columns: sidebar / center / AI module
    --------------------------------------------------------------- */
 .app {
-  max-width: 1000px;
+  /* M9: the shell is fluid but capped — a 1000 px box wasted a 1440+ screen
+     and a fully uncapped one turns a 2560 screen into unreadable line
+     lengths. `min(1680px, 100%)` gives every desktop width the same roomy
+     shell, centered, and stays 100% on small viewports. */
+  width: min(1680px, 100%);
   margin: 0 auto;
   background: var(--bg);
   border-radius: 26px;
@@ -130,25 +134,40 @@ a:focus-visible {
   gap: 10px;
   box-shadow: 0 30px 60px -20px rgba(0, 0, 0, 0.35);
 }
-/* Desktop: fill the entire viewport — full width, full height, slim gutter. */
-@media (min-width: 861px) {
+/* Desktop (≥768px): fill the viewport height — full height, slim gutter. */
+@media (min-width: 768px) {
   .app {
-    max-width: none;
-    width: 100%;
     height: calc(
       100dvh - 2 * var(--gut) - env(safe-area-inset-top, 0px) -
         env(safe-area-inset-bottom, 0px)
     );
   }
 }
-@media (min-width: 900px) {
+/* M9 ladder (clamp tracks, no fixed px jumps between nearby widths):
+   768–1023 narrow · 1024–1279 compact · 1280–1599 default · ≥1600 roomy. */
+@media (min-width: 768px) and (max-width: 1023px) {
   .app {
-    grid-template-columns: minmax(180px, 18%) minmax(0, 1fr) minmax(200px, 21%);
+    grid-template-columns: clamp(150px, 17vw, 196px) minmax(0, 1fr)
+      clamp(168px, 20vw, 224px);
+    gap: 8px;
   }
 }
-@media (min-width: 1440px) {
+@media (min-width: 1024px) and (max-width: 1279px) {
+  .app {
+    grid-template-columns: clamp(200px, 17vw, 232px) minmax(0, 1fr)
+      clamp(216px, 20vw, 256px);
+  }
+}
+@media (min-width: 1280px) and (max-width: 1599px) {
   .app {
     grid-template-columns: 280px minmax(0, 1fr) 340px;
+  }
+}
+@media (min-width: 1600px) {
+  .app {
+    grid-template-columns: clamp(300px, 19vw, 348px) minmax(0, 1fr)
+      clamp(344px, 22vw, 400px);
+    gap: 14px;
   }
 }
 .panel {
@@ -451,6 +470,19 @@ a.nav .item,
   align-items: center;
   gap: 8px;
 }
+/* Narrow sidebars (768–1023 desktop tier, and the 150px column below it):
+   the OLLAMA row's badge + chevron pushed 6px past the panel and created a
+   horizontal scrollbar inside `.side`. Buy that space back from the button's
+   own padding/gap instead of clipping the status. */
+@media (max-width: 1023px) {
+  .histbtn {
+    padding: 7px 7px;
+    gap: 4px;
+  }
+  .obar {
+    gap: 5px;
+  }
+}
 .pill {
   display: inline-flex;
   align-items: center;
@@ -597,7 +629,10 @@ a.nav .item,
 .modal {
   display: flex;
   flex-direction: column;
-  width: min(560px, 100%);
+  /* M9: 560px clipped the System info grid's two-column cards on desktop
+     and 100% made it viewport-wide on a 2560 screen — 720px reads, 92vw
+     never touches the backdrop's own 24px gutter. */
+  width: min(720px, 92vw);
   max-height: 85vh;
   border: 1px solid var(--line);
   border-radius: 14px;
@@ -1426,7 +1461,10 @@ button.tname:focus-visible,
 }
 
 /* ---------------- responsive ---------------- */
-@media (max-width: 860px) {
+/* Below the desktop ladder's floor the layout stops being three columns:
+   sidebar + chat side by side, the AI module drops underneath (M9 moved
+   this from 860px so the 768–1023 "narrow" tier keeps all three). */
+@media (max-width: 767px) {
   .app {
     grid-template-columns: 150px minmax(0, 1fr);
     height: auto;
