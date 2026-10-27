@@ -1,7 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { chatSessions, filterSessions } from "@/data/chat-sessions";
+import { useState } from "react";
+import { filterSessions, formatRelative } from "@/lib/history";
+import { useOllama } from "@/components/ModelProvider";
 import OllamaStatus from "@/components/OllamaStatus";
 
 const NAV_ITEMS = [
@@ -41,14 +42,38 @@ const NAV_ITEMS = [
 ];
 
 export default function Sidebar() {
-  const [query, setQuery] = useState("");
+  const {
+    sessions,
+    activeSessionId,
+    openSession,
+    startNewChat,
+    query,
+    setQuery,
+    streaming,
+    saveError,
+  } = useOllama();
   const [open, setOpen] = useState(false);
 
   // Typing in the search box auto-opens the raw JSON view.
   const effectiveOpen = open || query.trim().length > 0;
 
-  const sessions = useMemo(() => filterSessions(query), [query]);
-  const json = useMemo(() => JSON.stringify(sessions, null, 2), [sessions]);
+  const hydrated = sessions !== null;
+  const matches = filterSessions(sessions ?? [], query);
+
+  // The <pre> is never search-scoped (§5.5): it shows the open session's
+  // JSON, or the honest empty/zero-result/skeleton states (row 37). An
+  // empty query returns every session, so zero matches implies a query.
+  const json = !hydrated
+    ? "…"
+    : sessions.length === 0
+      ? "// No chats yet — messages you send are saved in this browser only.\n[]"
+      : matches.length === 0
+        ? `// No sessions match "${query.trim()}".`
+        : JSON.stringify(
+            sessions.find((s) => s.id === activeSessionId) ?? sessions[0],
+            null,
+            2,
+          );
 
   return (
     <aside className="panel side" aria-label="Sidebar">
@@ -102,6 +127,17 @@ export default function Sidebar() {
       <button
         type="button"
         className="histbtn"
+        aria-label="New chat"
+        disabled={streaming}
+        aria-disabled={streaming}
+        title={streaming ? "Stop the reply first" : undefined}
+        onClick={startNewChat}
+      >
+        ＋ New chat
+      </button>
+      <button
+        type="button"
+        className="histbtn"
         aria-expanded={effectiveOpen}
         onClick={() => setOpen((v) => !v)}
       >
@@ -114,10 +150,52 @@ export default function Sidebar() {
       {effectiveOpen && (
         <>
           <p className="jsonmeta">
-            {sessions.length} of {chatSessions.length} session
-            {sessions.length === 1 ? "" : "s"}
-            {query.trim() ? ` matching “${query.trim()}”` : ""} — raw JSON
+            {!hydrated ? (
+              "…"
+            ) : query.trim() ? (
+              <>
+                <strong>
+                  {matches.length} of {sessions.length}
+                </strong>{" "}
+                sessions matching &quot;{query.trim()}&quot;
+              </>
+            ) : (
+              <>
+                <strong>
+                  {sessions.length} session{sessions.length === 1 ? "" : "s"}
+                </strong>{" "}
+                — stored in this browser
+              </>
+            )}
           </p>
+          {saveError && (
+            <p className="saveerr">
+              Couldn&apos;t save this chat (browser storage is full).
+            </p>
+          )}
+          {hydrated && matches.length > 0 && (
+            <div className="histlist">
+              {matches.map((session) => (
+                <button
+                  key={session.id}
+                  type="button"
+                  className={`histrow${session.id === activeSessionId ? " on" : ""}`}
+                  aria-current={
+                    session.id === activeSessionId ? "true" : undefined
+                  }
+                  disabled={streaming}
+                  aria-disabled={streaming}
+                  title={streaming ? "Stop the reply first" : undefined}
+                  onClick={() => openSession(session.id)}
+                >
+                  <span className="htitle">{session.title}</span>
+                  <span className="hmeta">
+                    {session.model} · {formatRelative(session.updated_at)}
+                  </span>
+                </button>
+              ))}
+            </div>
+          )}
           <pre className="json" tabIndex={0} aria-label="Chat history as JSON">
             {json}
           </pre>

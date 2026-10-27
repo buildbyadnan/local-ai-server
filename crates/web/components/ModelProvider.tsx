@@ -3,8 +3,10 @@
 /**
  * Single client-side owner of Ollama state for the whole home screen:
  * the status poll (mount + 5 s visibility-gated + focus + Re-check), the
- * selected model, and the "model vanished" notice. Sidebar, AiModule and
- * CenterChat are consumers only — no prop drilling through the server page.
+ * selected model, the "model vanished" notice, and — since M4 — the
+ * session store's subscription (which conversation is open, the search
+ * query, the quota notice). Sidebar, AiModule and CenterChat are consumers
+ * only — no prop drilling through the server page.
  *
  * Re-render discipline (CONNECTIVITY_PLAN §11.3): the context value is
  * memoized, and a fresh status snapshot is committed **only when it differs
@@ -13,8 +15,9 @@
  * the sidebar or the model tree; the provider only carries the flags other
  * components need (streaming, chat-empty, an active pull). Pull progress is
  * committed at most every 100 ms because Ollama emits a line per layer
- * chunk — far faster than anyone can read a percentage. M4 adds the
- * session store here; nothing unused ships before then.
+ * chunk — far faster than anyone can read a percentage. Session data lives
+ * in `lib/history.ts`'s external store; this provider subscribes once and
+ * derives the open-conversation id from it.
  */
 import {
   createContext,
@@ -24,8 +27,10 @@ import {
   useMemo,
   useRef,
   useState,
+  useSyncExternalStore,
   type ReactNode,
 } from "react";
+import { historyStore, newSessionId, type ChatSession } from "@/lib/history";
 import { feedChunk, parseJsonLine } from "@/lib/ndjson";
 import type { OllamaStatus } from "@/lib/ollama-types";
 
@@ -80,8 +85,12 @@ export interface OllamaContext {
   selected: string | null;
   /** Previously-selected model that vanished from this machine (row 18). */
   removed: string | null;
-  /** User-initiated pick: sets selection, persists it, clears `removed`. */
-  select: (name: string) => void;
+  /**
+   * Selection: user picks pass `{ restart: true }` to also mint a fresh
+   * conversation (§5.5's model-change reset); programmatic switches —
+   * session restore, pull auto-select — keep the open conversation.
+   */
+  select: (name: string, opts?: { restart?: boolean }) => void;
   /** Re-run the status poll now (Re-check button, after pulls). */
   refresh: () => void;
   /** True while a reply streams — consumers gate input on it (rows 32/38). */
@@ -98,6 +107,28 @@ export interface OllamaContext {
   startPull: (tag: string, pullSize: string) => void;
   /** Abort the pull fetch — Ollama keeps whatever layers it already wrote. */
   cancelPull: () => void;
+  /** Persisted sessions; `null` until browser storage is read (row 37). */
+  sessions: ChatSession[] | null;
+  /** Which conversation is open — the latest session, or a specific id. */
+  sessionChoice: "latest" | string;
+  /** Id of the session the open conversation edits (derived from the store). */
+  activeSessionId: string | null;
+  /**
+   * Row 36 — the open session's model is no longer on this machine: the
+   * conversation stays readable but the composer waits for a model pick.
+   * Single source of truth, so CenterChat's read-only state and the
+   * picker's "any pick counts as the choice" rule can't drift apart.
+   */
+  removedSessionModel: string | null;
+  /** Row click: open that session, adopting its model if still installed. */
+  openSession: (id: string) => void;
+  /** ＋ New chat / "Start new chat": a fresh, not-yet-saved conversation. */
+  startNewChat: () => void;
+  /** Sidebar search, filtering the `.histrow` list (§5.5). */
+  query: string;
+  setQuery: (value: string) => void;
+  /** The last save hit storage quota even after eviction (row 21). */
+  saveError: boolean;
 }
 
 const OllamaContext = createContext<OllamaContext | null>(null);
@@ -120,6 +151,49 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const [pulling, setPulling] = useState<PullProgress | null>(null);
   const [pullNote, setPullNote] = useState<PullNote | null>(null);
 
+  // The §5.5 session store: one subscription feeds the sidebar, CenterChat's
+  // seed and the restore rule; `saveError` is row 21's quota notice.
+  const sessions = useSyncExternalStore(
+    historyStore.subscribe,
+    historyStore.getSnapshot,
+    historyStore.getServerSnapshot,
+  );
+  const saveError = useSyncExternalStore(
+    historyStore.subscribe,
+    historyStore.getSaveError,
+    historyStore.getSaveErrorServerSnapshot,
+  );
+  const [query, setQuery] = useState("");
+  /** "latest" until the user opens a row or starts a new chat (§5.5). */
+  const [sessionChoice, setSessionChoice] = useState<"latest" | string>(
+    "latest",
+  );
+
+  /**
+   * The session the open conversation edits. "latest" resolves against the
+   * store (most recently updated first), so the id follows saves without a
+   * remount; a chosen id may be newer than the store — the fresh-chat case.
+   */
+  const activeSessionId = useMemo(
+    () =>
+      sessionChoice !== "latest" ? sessionChoice : (sessions?.[0]?.id ?? null),
+    [sessionChoice, sessions],
+  );
+
+  /**
+   * Row 36, derived where both consumers can see it: the open session's
+   * model is gone once status is known. `null` while storage or status is
+   * still loading (nothing can be judged missing yet).
+   */
+  const removedSessionModel = useMemo(() => {
+    if (sessions === null || status === null) return null;
+    const seed = sessions.find((session) => session.id === activeSessionId);
+    if (!seed) return null;
+    return status.models.some((model) => model.name === seed.model)
+      ? null
+      : seed.model;
+  }, [sessions, status, activeSessionId]);
+
   // Poll bookkeeping: `seq` ensures only the latest response is applied,
   // the controller lets a new poll supersede an in-flight one.
   const seqRef = useRef(0);
@@ -130,6 +204,23 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const chatEmptyRef = useRef(true);
   /** The in-flight pull's controller — the provider's one-at-a-time lock. */
   const pullRef = useRef<AbortController | null>(null);
+  /** §5.5 model-on-restore applies on the first status, never again. */
+  const restoreRef = useRef(false);
+
+  /**
+   * Selection core: mirror the ref, commit, clear the row-18 notice and
+   * persist to `las.selected.v1` (shared across tabs via `storage`).
+   */
+  const applySelection = useCallback((name: string) => {
+    selectedRef.current = name;
+    setSelected(name);
+    setRemoved(null);
+    try {
+      window.localStorage.setItem(SELECTED_KEY, name);
+    } catch {
+      // Selection persistence is best-effort; the session keeps working.
+    }
+  }, []);
 
   const refresh = useCallback((): Promise<void> => {
     const seq = ++seqRef.current;
@@ -151,6 +242,15 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
           setStatus(next);
         }
         setPhase("ready");
+        // §5.5 model-on-restore, once: the newest session's model answers
+        // the conversation restored with it — silently, if still installed.
+        if (next.running && !restoreRef.current) {
+          restoreRef.current = true;
+          const model = historyStore.getSnapshot()?.[0]?.model;
+          if (model !== undefined && next.models.some((m) => m.name === model)) {
+            applySelection(model);
+          }
+        }
       })
       .catch((error: unknown) => {
         // Aborted/superseded polls are silent. A real failure keeps the last
@@ -158,7 +258,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
         // never succeeded, the pill honestly stays on "Checking…".
         if (error instanceof DOMException && error.name === "AbortError") return;
       });
-  }, []);
+  }, [applySelection]);
 
   // Mount + 5 s visibility-gated interval + window focus (returning from a
   // terminal where Ollama was started/stopped).
@@ -208,16 +308,50 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
     }
   }, [status]);
 
-  const select = useCallback((name: string) => {
-    selectedRef.current = name;
-    setSelected(name);
-    setRemoved(null);
-    try {
-      window.localStorage.setItem(SELECTED_KEY, name);
-    } catch {
-      // best-effort
-    }
-  }, []);
+  // Row 19: a model picked in another tab is adopted here — state only, so
+  // the event never echoes back as a write. Unknown picks are ignored (the
+  // picker only offers what this machine has).
+  useEffect(() => {
+    const onStorage = (event: StorageEvent) => {
+      if (event.key !== SELECTED_KEY) return;
+      const picked = event.newValue;
+      if (picked === null) return;
+      if (!status?.models.some((model) => model.name === picked)) return;
+      selectedRef.current = picked;
+      setSelected(picked);
+      setRemoved(null);
+    };
+    window.addEventListener("storage", onStorage);
+    return () => window.removeEventListener("storage", onStorage);
+  }, [status]);
+
+  const select = useCallback(
+    (name: string, opts?: { restart?: boolean }) => {
+      applySelection(name);
+      // §5.5 reset rule: a user pick starts a fresh conversation — its
+      // messages are already written by the save points. Programmatic
+      // switches (restore, pull auto-select) pass nothing and keep it.
+      if (opts?.restart) setSessionChoice(newSessionId());
+    },
+    [applySelection],
+  );
+
+  /** Row click: open that session, adopting its model if still installed. */
+  const openSession = useCallback(
+    (id: string) => {
+      setSessionChoice(id);
+      const session = historyStore.getSnapshot()?.find((s) => s.id === id);
+      if (session && status?.models.some((m) => m.name === session.model)) {
+        select(session.model); // silent programmatic pick — never a confirm
+      }
+    },
+    [status, select],
+  );
+
+  const startNewChat = useCallback(
+    () => setSessionChoice(newSessionId()),
+    [],
+  );
 
   /** Mirror for `chatEmpty` — the pull callback reads the live value. */
   const setChatEmpty = useCallback((value: boolean) => {
@@ -417,6 +551,15 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
       pullNote,
       startPull,
       cancelPull,
+      sessions,
+      sessionChoice,
+      activeSessionId,
+      removedSessionModel,
+      openSession,
+      startNewChat,
+      query,
+      setQuery,
+      saveError,
     }),
     [
       phase,
@@ -432,6 +575,14 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
       pullNote,
       startPull,
       cancelPull,
+      sessions,
+      sessionChoice,
+      activeSessionId,
+      removedSessionModel,
+      openSession,
+      startNewChat,
+      query,
+      saveError,
     ],
   );
 

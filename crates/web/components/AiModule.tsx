@@ -26,6 +26,7 @@ export default function AiModule() {
     status,
     selected,
     removed,
+    removedSessionModel,
     select,
     streaming,
     chatEmpty,
@@ -48,12 +49,19 @@ export default function AiModule() {
     [status],
   );
 
-  /** Pick from the menu: silent when the chat is empty, confirmed otherwise. */
+  /** Pick from the menu: silent when the chat is empty, confirmed otherwise.
+   *  Both paths restart — §5.5's model-change reset — and the messages are
+   *  already written by the save points, so nothing is lost (§5.2).
+   *
+   *  Row 36 exception: while the open session's model is gone, re-picking
+   *  the *already selected* model must not be a no-op — it is the "choose a
+   *  model" the read-only composer waits for, and it has to work even when
+   *  it's the only model on this machine. */
   function pick(name: string) {
     setMenuOpen(false);
-    if (name === selected) return;
-    if (chatEmpty) {
-      select(name);
+    if (name === selected && removedSessionModel === null) return;
+    if (chatEmpty && removedSessionModel === null) {
+      select(name, { restart: true });
       return;
     }
     setPending(name);
@@ -136,15 +144,14 @@ export default function AiModule() {
       {pending && (
         <div className="switchbox">
           <span>
-            Switch to {pending}? This starts a new chat — the current one
-            won&apos;t be saved.
+            Switch to {pending}? Your current chat stays as its own session.
           </span>
           <span className="row">
             <button
               type="button"
               className="btn"
               onClick={() => {
-                select(pending);
+                select(pending, { restart: true });
                 setPending(null);
               }}
             >

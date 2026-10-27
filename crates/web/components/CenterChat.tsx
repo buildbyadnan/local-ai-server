@@ -3,11 +3,18 @@
 import { useEffect, useRef, useState } from "react";
 import { useOllama } from "@/components/ModelProvider";
 import { StarterCta } from "@/components/Pull";
+import {
+  historyStore,
+  newSessionId,
+  type ChatSession,
+} from "@/lib/history";
 import { feedChunk, parseJsonLine } from "@/lib/ndjson";
 
 interface Bubble {
   role: "user" | "assistant";
   text: string;
+  /** ISO stamp from the session (seeded) or the moment this text appeared. */
+  at: string;
   /** Partial answer of a failed stream — kept on screen, never sent back. */
   failed?: boolean;
   /** Reply the user cut short with Stop — real text, shown as "stopped". */
@@ -48,11 +55,14 @@ function isOverflow(text: string): boolean {
  * coordination flags (streaming, chat-empty, an active pull) so other
  * panels can gate on them.
  *
- * `CenterChat` remounts this component with `key={selected}`, so changing
- * model starts a fresh conversation without a reset-effect (§5.5) — the
- * same signal also covers a model that vanished from the machine.
+ * Session lifecycle (§5.5): `seed` (the session this conversation opens)
+ * initializes `messages` and the session id at mount; every write goes
+ * through `persist()` — on send (creates the session) and at every stream
+ * end (done, Stop, or error), so a reload restores exactly what was on
+ * screen. `CenterChat` remounts this component on `key`, so a model or
+ * session switch starts a fresh conversation without a reset-effect.
  */
-function Conversation() {
+function Conversation({ seed }: { seed: ChatSession | null }) {
   const {
     phase,
     status,
@@ -62,15 +72,35 @@ function Conversation() {
     setStreaming,
     setChatEmpty,
     pulling,
+    sessionChoice,
+    startNewChat,
+    removedSessionModel,
   } = useOllama();
   const [draft, setDraft] = useState("");
-  const [messages, setMessages] = useState<Bubble[]>([]);
+  const [messages, setMessages] = useState<Bubble[]>(() =>
+    (seed?.messages ?? []).map((m) => ({
+      role: m.role,
+      text: m.content,
+      at: m.at,
+    })),
+  );
+  /** Mirror of `messages` so async stream callbacks read the live list. */
+  const messagesRef = useRef<Bubble[]>(messages);
   const [error, setError] = useState<ChatError | null>(null);
   const [warming, setWarming] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   /** Exactly what the last send transmitted — what Retry resends. */
   const payloadRef = useRef<Array<{ role: string; content: string }>>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
+  /**
+   * The session this conversation writes to: the seed's id, the explicitly
+   * chosen one, or — for "latest" with nothing stored yet — a fresh id
+   * minted on the first send. It must never change mid-conversation, so a
+   * session created by another tab is not adopted.
+   */
+  const sessionRef = useRef<string | null>(
+    seed?.id ?? (sessionChoice !== "latest" ? sessionChoice : null),
+  );
 
   const installed = status?.models.map((model) => model.name) ?? [];
   const canSend =
@@ -79,6 +109,34 @@ function Conversation() {
     status.running &&
     selected !== null &&
     installed.includes(selected);
+  // Row 36 (`removedSessionModel`, derived by the provider): the restored
+  // session's model isn't on this machine any more — messages stay
+  // readable, the composer waits for a model pick.
+
+  /** Single mutation point: state and its live mirror move together. */
+  function apply(next: Bubble[]) {
+    messagesRef.current = next;
+    setMessages(next);
+  }
+
+  /**
+   * §5.5 write points (a)+(b)+(c): create on first send, stamp `updated_at`
+   * on every save, and re-write at every stream end — a Stop or a crashed
+   * reply survives reload (rows 34/35).
+   */
+  function persist() {
+    if (selected === null) return; // a conversation only exists under a model
+    sessionRef.current ??= newSessionId();
+    historyStore.saveSession({
+      id: sessionRef.current,
+      model: selected,
+      messages: messagesRef.current.map((m) => ({
+        role: m.role,
+        content: m.text,
+        at: m.at,
+      })),
+    });
+  }
 
   // A conversation must never outlive its component: if the model changes
   // while a reply streams, the unmount cancels the read instead of letting
@@ -102,16 +160,19 @@ function Conversation() {
   }, [messages]);
 
   function append(content: string) {
-    setMessages((prev) => {
-      const last = prev[prev.length - 1];
-      if (last && last.role === "assistant") {
-        return [
-          ...prev.slice(0, -1),
-          { ...last, text: last.text + content, failed: false },
-        ];
-      }
-      return [...prev, { role: "assistant", text: content }];
-    });
+    const prev = messagesRef.current;
+    const last = prev[prev.length - 1];
+    if (last && last.role === "assistant") {
+      apply([
+        ...prev.slice(0, -1),
+        { ...last, text: last.text + content, failed: false },
+      ]);
+      return;
+    }
+    apply([
+      ...prev,
+      { role: "assistant", text: content, at: new Date().toISOString() },
+    ]);
   }
 
   function run(payload: Array<{ role: string; content: string }>) {
@@ -145,13 +206,11 @@ function Conversation() {
             ? { kind: "overflow", text: parsed.error }
             : { kind: "stream", text: parsed.error },
         );
-        setMessages((prev) => {
-          const last = prev[prev.length - 1];
-          if (last && last.role === "assistant") {
-            return [...prev.slice(0, -1), { ...last, failed: true }];
-          }
-          return prev;
-        });
+        const prev = messagesRef.current;
+        const last = prev[prev.length - 1];
+        if (last && last.role === "assistant") {
+          apply([...prev.slice(0, -1), { ...last, failed: true }]);
+        }
         return;
       }
       const content = parsed.message?.content;
@@ -206,13 +265,11 @@ function Conversation() {
           // Stopped before the first token? Then this run wrote no bubble
           // and the previous reply must stay unmarked.
           if (producedText) {
-            setMessages((prev) => {
-              const last = prev[prev.length - 1];
-              if (last && last.role === "assistant") {
-                return [...prev.slice(0, -1), { ...last, stopped: true }];
-              }
-              return prev;
-            });
+            const prev = messagesRef.current;
+            const last = prev[prev.length - 1];
+            if (last && last.role === "assistant") {
+              apply([...prev.slice(0, -1), { ...last, stopped: true }]);
+            }
           }
           return;
         }
@@ -222,6 +279,7 @@ function Conversation() {
         abortRef.current = null;
         setWarming(false);
         setStreaming(false);
+        persist(); // §5.5(c) — done, Stop or error, the session is written
         refresh(); // re-read /api/ps so the next send knows it is warm
       });
   }
@@ -231,24 +289,22 @@ function Conversation() {
     const text = draft.trim();
     if (!text || streaming || !canSend) return; // rows 12/25
     const payload = [
-      ...messages
+      ...messagesRef.current
         .filter((m) => !m.failed)
         .map((m) => ({ role: m.role, content: m.text })),
       { role: "user", content: text },
     ];
-    setMessages((prev) => [...prev, { role: "user", text }]);
+    apply([
+      ...messagesRef.current,
+      { role: "user", text, at: new Date().toISOString() },
+    ]);
     setDraft("");
+    persist(); // §5.5(a) — the first send creates the session
     run(payload);
   }
 
   function stop() {
     abortRef.current?.abort();
-  }
-
-  function startNewChat() {
-    setMessages([]);
-    setError(null);
-    setWarming(false);
   }
 
   const noModels = status !== null && status.running && installed.length === 0;
@@ -267,17 +323,20 @@ function Conversation() {
   }
 
   const placeholder =
-    phase === "checking"
-      ? "Checking Ollama…"
-      : down
-        ? "Ollama isn't running — start it from the Ollama section in the sidebar."
-        : noModels
-          ? "No models on this machine yet."
-          : !canSend
-            ? "Pick a model to chat."
-            : "Message the local model…";
+    removedSessionModel !== null
+      ? "Pick another model to chat."
+      : phase === "checking"
+        ? "Checking Ollama…"
+        : down
+          ? "Ollama isn't running — start it from the Ollama section in the sidebar."
+          : noModels
+            ? "No models on this machine yet."
+            : !canSend
+              ? "Pick a model to chat."
+              : "Message the local model…";
 
-  const composerDisabled = phase !== "ready" || !canSend;
+  const composerDisabled =
+    phase !== "ready" || !canSend || removedSessionModel !== null;
 
   return (
     <main className="main">
@@ -293,6 +352,12 @@ function Conversation() {
             Ollama isn&apos;t running — start it from the Ollama section in the
             sidebar.
           </button>
+        )}
+
+        {removedSessionModel !== null && (
+          <p className="oremove" role="status">
+            {removedSessionModel} was removed — pick another model.
+          </p>
         )}
 
         {messages.length === 0 ? (
@@ -322,7 +387,7 @@ function Conversation() {
                 <span className="who">
                   {m.role === "user"
                     ? "You"
-                    : `${selected ?? "model"}${m.stopped ? " · stopped" : ""}`}
+                    : `${seed?.model ?? selected ?? "model"}${m.stopped ? " · stopped" : ""}`}
                 </span>
                 {m.text}
               </div>
@@ -413,11 +478,21 @@ function Conversation() {
 }
 
 /**
- * Keyed wrapper: picking another model mounts a brand-new conversation, so
- * the old one can never be written into (§5.5 — model change starts a new
- * conversation) and no reset-effect is needed.
+ * Keyed wrapper (§5.5): the conversation remounts when the model changes
+ * (the reset rule), when another session opens or a new chat starts (the
+ * explicit `sessionChoice`), and once when storage hydration completes —
+ * so the restored session seeds the first real render while the skeleton
+ * render before it never locks in an empty conversation. Token updates
+ * never change the key; `seed` is read at mount only.
  */
 export default function CenterChat() {
-  const { selected } = useOllama();
-  return <Conversation key={selected ?? "no-model"} />;
+  const { selected, sessionChoice, sessions, activeSessionId } = useOllama();
+  const seed =
+    sessions?.find((session) => session.id === activeSessionId) ?? null;
+  return (
+    <Conversation
+      key={`${selected ?? "no-model"}::${sessionChoice}::${sessions === null ? "raw" : "read"}`}
+      seed={seed}
+    />
+  );
 }

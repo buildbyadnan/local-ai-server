@@ -15,7 +15,7 @@ const geistMono = Geist_Mono({
 export const metadata: Metadata = {
   title: "Local AI Server",
   description:
-    "Chat with local models via ollama — a private, offline AI chat interface.",
+    "Chat with local models via Ollama — a private, offline AI chat interface.",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

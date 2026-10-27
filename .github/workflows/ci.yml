@@ -29,7 +29,7 @@ jobs:
         run: cargo test --locked
 
   web:
-    name: web (lint + build)
+    name: web (lint + test + build)
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -52,6 +52,9 @@ jobs:
 
       - name: Lint
         run: pnpm lint
+
+      - name: Test
+        run: pnpm test
 
       - name: Build
         run: pnpm build

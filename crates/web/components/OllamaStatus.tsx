@@ -221,7 +221,7 @@ export default function OllamaStatus() {
               </div>
               {status.models.length > 0 && (
                 <button type="button" className="olink" onClick={jumpToPicker}>
-                  → pick one in the model picker
+                  → jump to picker
                 </button>
               )}
             </>

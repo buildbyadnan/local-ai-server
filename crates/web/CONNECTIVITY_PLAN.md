@@ -763,6 +763,23 @@ restore notice (§5.5 + row 36), "A model is downloading in the background."
 Voice check at M4: the section must read like `llama`'s guided recommender
 (same defaults — `DEFAULT_TAG`, same plain-English register).
 
+- **M4:** the switch confirm lands §5.2's sentence verbatim — "Switch to
+  {model}? Your current chat stays as its own session." — which is only now
+  true: every message on screen has already been through §5.5's save points
+  by the time the confirm can appear (a stream blocks it, row 32).
+- **M4:** sessions reach the UI through `lib/history.ts`'s external store
+  (`useSyncExternalStore`), not §5.2's `setSessions` enumeration —
+  `react-hooks/set-state-in-effect` forbids the effect-based read §5.5
+  sketched, and the store is what makes row 37's `null`-until-hydrated
+  snapshot, row 19's merge-without-write-back, the quota guard and the
+  shared caps fall out of one module. The context carries `sessions`,
+  `sessionChoice`, `activeSessionId`, `openSession`, `startNewChat`,
+  `query` and `saveError`.
+- **M4:** `＋ New chat` and a user model switch **mint a fresh session id**
+  instead of clearing state — the keyed remount *is* the reset, so a blank
+  conversation can never be written back into the session it was opened
+  from, and no effect has to clear anything.
+
 ---
 
 ## 9. Milestones (each ends with the applicable §10 subset)

@@ -251,15 +251,31 @@ bazel test //crates/llama-cli:llama-cli_test
 
 A local-only Next.js chat interface for the same Ollama backend — a side crate
 that never ships. It builds with **pnpm**, not Bazel (`.bazelignore` keeps it
-out of `//...`), and CI lints + builds it alongside the Cargo matrix:
+out of `//...`), and CI lints, tests and builds it alongside the Cargo matrix.
+
+**Want to run it? You need two free installs and four commands — no AI
+knowledge required, and nothing you type leaves your machine.**
+
+1. **[Node.js 20+](https://nodejs.org)** — install the *LTS* version, then
+   run `corepack enable` once in a terminal so the `pnpm` command works.
+2. **[Ollama](https://ollama.com/download)** — the free local AI server.
+   Install it and start it (open the app; on Linux run `ollama serve`).
+
+Then:
 
 ```bash
-cd crates/web
-pnpm install
-pnpm dev        # http://localhost:3000
+git clone https://github.com/buildbyadnan/local-ai-server.git
+cd local-ai-server/crates/web
+pnpm install            # downloads the app's packages (first time only)
+ollama pull llama3.2    # downloads a small ~2 GB model (first time only)
+pnpm dev                # opens the app at http://127.0.0.1:3000
 ```
 
-See [`crates/web/README.md`](crates/web/README.md) for the full tour.
+Open **<http://127.0.0.1:3000>**: the sidebar should read `● Connected`,
+click `llama3.2:latest` in the right-hand panel, and type a message — replies
+stream live from your machine and chats are saved in that browser only.
+Stuck? The full walkthrough plus a "something not working?" table is in
+[`crates/web/README.md`](crates/web/README.md).
 
 ### Project layout
 
@@ -270,7 +286,7 @@ llama/
 ├── .bazelversion / .bazelrc     # pins Bazel 9.3.1
 ├── install.sh / install.ps1     # prebuilt-binary installers (mac/linux, windows)
 ├── .github/workflows/
-│   ├── ci.yml                   # tests on Linux/macOS/Windows + web lint/build
+│   ├── ci.yml                   # tests on Linux/macOS/Windows + web lint/test/build
 │   └── release.yml              # builds release binaries on a v* tag
 └── crates/
     ├── llama-cli/

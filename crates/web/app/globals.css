@@ -1,5 +1,6 @@
 /* ---------------------------------------------------------------
-   Local AI Server — design tokens (ported from the original Query UI)
+   Local AI Server — design tokens (carried over from the original
+   prototype — same palette and type scale, no product name anywhere).
 
    One hand-rolled stylesheet: tokens, a minimal reset, then components.
    No CSS framework — the reset below is the small subset of standard
@@ -214,6 +215,13 @@ a:focus-visible {
   font: inherit;
   outline: 0;
 }
+/* `outline: 0` above beats the global `input:focus-visible` rule (same
+   specificity, later in the sheet), so the ring has to be restored here —
+   keyboard users must be able to see where they are in the search box. */
+.search input:focus-visible {
+  outline: 2px solid var(--g);
+  outline-offset: 2px;
+}
 .lbl {
   color: var(--dim);
   font-size: 9.5px;
@@ -305,6 +313,76 @@ a:focus-visible {
 .json::-webkit-scrollbar-thumb {
   background: #2a2d2a;
   border-radius: 6px;
+}
+/* The <pre> is tabbable so it can be scrolled by keyboard — it needs the
+   same visible focus indicator the buttons and inputs have. */
+.json:focus-visible {
+  outline: 2px solid var(--g);
+  outline-offset: 2px;
+}
+.saveerr {
+  margin-top: 6px;
+  color: var(--y);
+  font-size: 9.5px;
+  line-height: 1.5;
+}
+/* Session rows above the raw JSON — the list scrolls internally so 20
+   sessions can't blow the sidebar (§5.5 space math, §10.5 space pass). */
+.histlist {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 6px;
+  max-height: min(40vh, 300px);
+  overflow-y: auto;
+  padding-right: 2px;
+  scrollbar-width: thin;
+  scrollbar-color: #2a2d2a transparent;
+}
+.histrow {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 7px 9px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #161916;
+  color: var(--tx);
+  font-size: 11px;
+  text-align: left;
+  cursor: pointer;
+}
+.histrow:hover {
+  border-color: #2e8a3d;
+}
+.histrow.on {
+  border-color: #2e8a3d;
+  background: #0f2a14;
+}
+.histrow:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+.histrow:focus-visible {
+  outline: 1px solid var(--g);
+  outline-offset: 1px;
+}
+.histrow .htitle {
+  overflow: hidden;
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.histrow .hmeta {
+  overflow: hidden;
+  color: var(--dim);
+  font-size: 9.5px;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.histbtn + .histbtn {
+  margin-top: 4px;
 }
 
 /* ---------------- left: Ollama status ---------------- */
@@ -565,6 +643,12 @@ a:focus-visible {
   font-size: 11px;
   outline: 0;
   padding: 8px 2px;
+}
+/* Same specificity fix as `.search input`: the reset above would otherwise
+   swallow the keyboard focus ring on the message box. */
+.in input:focus-visible {
+  outline: 2px solid var(--g);
+  outline-offset: 2px;
 }
 .in input::placeholder {
   color: var(--dim);
@@ -1080,6 +1164,16 @@ button.tname:focus-visible,
   .histbtn {
     font-size: 13px;
     padding: 11px 10px;
+  }
+  .histrow {
+    font-size: 12.5px;
+    padding: 9px 10px;
+  }
+  .histrow .hmeta {
+    font-size: 10.5px;
+  }
+  .saveerr {
+    font-size: 10.5px;
   }
   .jsonmeta {
     font-size: 10.5px;
