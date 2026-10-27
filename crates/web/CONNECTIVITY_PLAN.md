@@ -710,6 +710,7 @@ own test uses `qwen2.5:7b`, `catalog.rs:417-430`); `llama3.2-vision:latest`
 | 44 | Start would be pointless (non-stock `OLLAMA_HOST`) | `isStockLocalHost(status.host)` false | No Start button — spawning a stock server could never flip this status | M5 |
 | 45 | Show models while Ollama is down | `status.running === false` | "Ollama isn't running at {host}…" — no fabricated list | M5 |
 | 46 | Clipboard write refused | permission / insecure context | Button says "Couldn't copy" and the command stays selectable — never a false "Copied ✓" | M5 |
+| 47 | Non-Llama model is the persisted/open selection | `isLlamaModel(name, families)` false | Selection cleared (key removed), blocked from auto-pick, "{model} isn't used by this app — pick a Llama model to chat." until the user picks | M6 |
 
 ---
 
@@ -808,6 +809,13 @@ Voice check at M4: the section must read like `llama`'s guided recommender
   "143.4 GB free of 247.7 GB", "3m 17s") and renders `—` for anything it
   couldn't read — no rounded-up comfort numbers, no invented Next/Node
   versions.
+
+- **M6:** the picker's empty/refusal line is "gemma4:12b isn't used by
+  this app — pick a Llama model to chat." — named, not euphemized. The
+  OLLAMA list keeps every installed model (it is the machine's inventory)
+  but non-Llama chips render dashed/dim with a "Not used by this app"
+  tooltip and the models dialog appends "· not used by this app" to the
+  row: visible, deletable, never chat-selectable.
 
 ---
 

@@ -26,6 +26,7 @@ import { useState, useSyncExternalStore } from "react";
 import { useOllama } from "@/components/ModelProvider";
 import Modal from "@/components/Modal";
 import { formatBytes } from "@/lib/format";
+import { isLlamaModel } from "@/lib/family";
 import { isStockLocalHost } from "@/lib/host";
 
 type Os = "macos" | "linux" | "windows";
@@ -391,7 +392,17 @@ export default function OllamaStatus() {
                   <span className="odim">None yet — pick a model from the tree on the right.</span>
                 ) : (
                   status.models.map((model) => (
-                    <span key={model.name} className="omodel">
+                    <span
+                      key={model.name}
+                      /* M6: still listed — OLLAMA is the machine's truth —
+                         but visibly not a chat model of this app. */
+                      className={`omodel${isLlamaModel(model.name, model.families) ? "" : " other"}`}
+                      title={
+                        isLlamaModel(model.name, model.families)
+                          ? undefined
+                          : "Not used by this app"
+                      }
+                    >
                       {model.name}
                     </span>
                   ))
@@ -523,6 +534,9 @@ export default function OllamaStatus() {
                     <span className="mmeta">
                       {formatBytes(model.size)}
                       {model.parameterSize ? ` · ${model.parameterSize} parameters` : ""}
+                      {!isLlamaModel(model.name, model.families)
+                        ? " · not used by this app"
+                        : ""}
                     </span>
                   </div>
                   <div className="macts">

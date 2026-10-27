@@ -12,10 +12,27 @@ import type { InstalledModel, OllamaStatus } from "@/lib/ollama-types";
 
 const NO_STORE = { "Cache-Control": "no-store" };
 
+/**
+ * `details.families` (newer Ollama) folded with `details.family` (older),
+ * strings only — `[]` when neither is present, which is exactly the case
+ * `isLlamaModel` falls back to the name for (M6).
+ */
+function familiesOf(details: UpstreamModel["details"]): string[] {
+  const fromList = Array.isArray(details?.families)
+    ? details.families.filter((entry): entry is string => typeof entry === "string")
+    : [];
+  const single = typeof details?.family === "string" ? [details.family] : [];
+  return [...new Set([...fromList, ...single])];
+}
+
 interface UpstreamModel {
   name?: unknown;
   size?: unknown;
-  details?: { parameter_size?: unknown };
+  details?: {
+    parameter_size?: unknown;
+    families?: unknown;
+    family?: unknown;
+  };
 }
 
 interface UpstreamTags {
@@ -69,6 +86,7 @@ export async function GET(request: Request): Promise<Response> {
               typeof model.details?.parameter_size === "string"
                 ? model.details.parameter_size
                 : "",
+            families: familiesOf(model.details),
           },
         ]
       : [],

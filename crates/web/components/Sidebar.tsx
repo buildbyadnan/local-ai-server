@@ -1,22 +1,28 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { filterSessions, formatRelative } from "@/lib/history";
 import { useOllama } from "@/components/ModelProvider";
 import OllamaStatus from "@/components/OllamaStatus";
 import SystemInfo from "@/components/SystemInfo";
 
-const NAV_ITEMS = [
-  {
-    label: "Dashboard",
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="m3 11 9-8 9 8v9a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" />
-      </svg>
-    ),
-  },
+/**
+ * Sidebar navigation. Deliberately short: every entry must lead somewhere
+ * that exists. The original four-item list shipped two doors to rooms the
+ * app doesn't have ("Dashboard", "Plugins") and a "Library" that did
+ * nothing when clicked — dead nav is worse than no nav, so only the two
+ * real destinations stay: this chat page and the model library at /llama.
+ */
+const NAV_ITEMS: {
+  label: string;
+  href: string;
+  current?: boolean;
+  svg: React.ReactNode;
+}[] = [
   {
     label: "AI Chat",
+    href: "/",
     current: true,
     svg: (
       <svg viewBox="0 0 24 24" fill="currentColor">
@@ -26,17 +32,10 @@ const NAV_ITEMS = [
   },
   {
     label: "Library",
+    href: "/llama",
     svg: (
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
         <path d="M4 5h6a2 2 0 0 1 2 2v13a2 2 0 0 0-2-2H4zM20 5h-6a2 2 0 0 0-2 2v13a2 2 0 0 1 2-2h6z" />
-      </svg>
-    ),
-  },
-  {
-    label: "Plugins",
-    svg: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-        <path d="M4 4h7v7H4zM13 4h7v7h-7zM4 13h7v7H4zM13 13h7v7h-7z" />
       </svg>
     ),
   },
@@ -110,16 +109,23 @@ export default function Sidebar() {
 
       <div className="lbl">FEATURES</div>
       <nav className="nav" aria-label="Features">
-        {NAV_ITEMS.map((item) => (
-          <span
-            key={item.label}
-            className={`item${item.current ? " on" : ""}`}
-            aria-current={item.current ? "page" : undefined}
-          >
-            {item.svg}
-            {item.label}
-          </span>
-        ))}
+        {NAV_ITEMS.map((item) =>
+          item.current ? (
+            <span
+              key={item.label}
+              className="item on"
+              aria-current="page"
+            >
+              {item.svg}
+              {item.label}
+            </span>
+          ) : (
+            <Link key={item.label} href={item.href} className="item">
+              {item.svg}
+              {item.label}
+            </Link>
+          ),
+        )}
       </nav>
 
       {/* System info sits directly above OLLAMA (§9 M5) — same row shape,

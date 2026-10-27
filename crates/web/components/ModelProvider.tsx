@@ -31,6 +31,7 @@ import {
   type ReactNode,
 } from "react";
 import { historyStore, newSessionId, type ChatSession } from "@/lib/history";
+import { isLlamaModel } from "@/lib/family";
 import { feedChunk, parseJsonLine } from "@/lib/ndjson";
 import type { OllamaStatus } from "@/lib/ollama-types";
 
@@ -85,6 +86,12 @@ export interface OllamaContext {
   selected: string | null;
   /** Previously-selected model that vanished from this machine (row 18). */
   removed: string | null;
+  /**
+   * M6 — a non-Llama model was offered as the selection (persisted pick or
+   * an open session's model) and was refused: the name to explain in the
+   * UI until the user picks a Llama model.
+   */
+  nonLlama: string | null;
   /**
    * Selection: user picks pass `{ restart: true }` to also mint a fresh
    * conversation (§5.5's model-change reset); programmatic switches —
@@ -146,6 +153,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const [status, setStatus] = useState<OllamaStatus | null>(null);
   const [selected, setSelected] = useState<string | null>(null);
   const [removed, setRemoved] = useState<string | null>(null);
+  const [nonLlama, setNonLlama] = useState<string | null>(null);
   const [streaming, setStreaming] = useState(false);
   const [chatEmpty, setChatEmptyState] = useState(true);
   const [pulling, setPulling] = useState<PullProgress | null>(null);
@@ -168,7 +176,6 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const [sessionChoice, setSessionChoice] = useState<"latest" | string>(
     "latest",
   );
-
   /**
    * The session the open conversation edits. "latest" resolves against the
    * store (most recently updated first), so the id follows saves without a
@@ -206,15 +213,20 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const pullRef = useRef<AbortController | null>(null);
   /** §5.5 model-on-restore applies on the first status, never again. */
   const restoreRef = useRef(false);
+  /** M6: a non-Llama pick was refused — don't silently auto-pick after it. */
+  const blockedRef = useRef(false);
 
   /**
    * Selection core: mirror the ref, commit, clear the row-18 notice and
-   * persist to `las.selected.v1` (shared across tabs via `storage`).
+   * the M6 refusal, un-block auto-picking, and persist to
+   * `las.selected.v1` (shared across tabs via `storage`).
    */
   const applySelection = useCallback((name: string) => {
     selectedRef.current = name;
     setSelected(name);
     setRemoved(null);
+    setNonLlama(null);
+    blockedRef.current = false;
     try {
       window.localStorage.setItem(SELECTED_KEY, name);
     } catch {
@@ -243,12 +255,21 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
         }
         setPhase("ready");
         // §5.5 model-on-restore, once: the newest session's model answers
-        // the conversation restored with it — silently, if still installed.
+        // the conversation restored with it — silently, if still installed
+        // *and* usable for chat here (M6: a gemma session must not smuggle
+        // gemma back into the selection — it gets the refusal notice).
         if (next.running && !restoreRef.current) {
           restoreRef.current = true;
           const model = historyStore.getSnapshot()?.[0]?.model;
-          if (model !== undefined && next.models.some((m) => m.name === model)) {
-            applySelection(model);
+          const restored =
+            model === undefined
+              ? undefined
+              : next.models.find((m) => m.name === model);
+          if (restored && isLlamaModel(restored.name, restored.families)) {
+            applySelection(restored.name);
+          } else if (restored) {
+            setNonLlama(restored.name);
+            blockedRef.current = true;
           }
         }
       })
@@ -281,14 +302,39 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   // Selection reconciliation. Runs only when the status value changes.
   useEffect(() => {
     if (!status) return;
-    const names = status.models.map((model) => model.name);
+    // Models this app may chat with (M6) — the picker and every auto-pick
+    // draw from this list, never from the raw machine inventory.
+    const chatNames = status.models
+      .filter((model) => isLlamaModel(model.name, model.families))
+      .map((model) => model.name);
     const current = selectedRef.current;
 
-    if (current && names.includes(current)) return; // still installed (rows 5/6)
+    if (current !== null && chatNames.includes(current)) return; // rows 5/6
     if (!status.running) return; // unreachable — don't guess (rows 5/6)
+
+    // M6: installed, but not a chat model for this app — refuse it, say so
+    // by name, forget the persisted pick, and stay unselected until the
+    // user chooses a chat model themselves.
+    if (current !== null && status.models.some((m) => m.name === current)) {
+      selectedRef.current = null;
+      setSelected(null);
+      setRemoved(null);
+      setNonLlama(current);
+      blockedRef.current = true;
+      try {
+        window.localStorage.removeItem(SELECTED_KEY);
+      } catch {
+        // Storage is best-effort; the in-memory refusal is what matters.
+      }
+      return;
+    }
 
     // Running and the current selection is gone → row 18 notice.
     if (current !== null) setRemoved(current);
+
+    // A deliberate refusal stays visible instead of being papered over by
+    // the next auto-pick (M6): the user decides what replaces it.
+    if (blockedRef.current) return;
 
     let stored: string | null = null;
     try {
@@ -296,7 +342,27 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
     } catch {
       stored = null; // storage unavailable (private mode) — fall back silently
     }
-    const next = stored !== null && names.includes(stored) ? stored : names[0] ?? null;
+
+    // M6: the persisted pick names a real model that isn't chat-usable
+    // here — say so and forget it, rather than silently swapping it for
+    // something else (the user should know their pick wasn't honored).
+    if (
+      stored !== null &&
+      !chatNames.includes(stored) &&
+      status.models.some((m) => m.name === stored)
+    ) {
+      setNonLlama(stored);
+      blockedRef.current = true;
+      try {
+        window.localStorage.removeItem(SELECTED_KEY);
+      } catch {
+        // best-effort; the in-memory refusal is what the user sees
+      }
+      return;
+    }
+
+    const next =
+      stored !== null && chatNames.includes(stored) ? stored : chatNames[0] ?? null;
     selectedRef.current = next;
     setSelected(next);
     if (next !== null) {
@@ -327,13 +393,28 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
 
   const select = useCallback(
     (name: string, opts?: { restart?: boolean }) => {
+      // M6's central guarantee: no call site — picker, guide row, session
+      // restore, pull auto-select — can land a non-Llama model in the
+      // selection. Refuse loudly instead of silently doing nothing.
+      const installed = status?.models.find((m) => m.name === name);
+      const usable =
+        status === null
+          ? isLlamaModel(name, null)
+          : installed
+            ? isLlamaModel(installed.name, installed.families)
+            : isLlamaModel(name, null);
+      if (!usable) {
+        setNonLlama(name);
+        blockedRef.current = true;
+        return;
+      }
       applySelection(name);
       // §5.5 reset rule: a user pick starts a fresh conversation — its
       // messages are already written by the save points. Programmatic
       // switches (restore, pull auto-select) pass nothing and keep it.
       if (opts?.restart) setSessionChoice(newSessionId());
     },
-    [applySelection],
+    [applySelection, status],
   );
 
   /** Row click: open that session, adopting its model if still installed. */
@@ -541,6 +622,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
       status,
       selected,
       removed,
+      nonLlama,
       select,
       refresh,
       streaming,
@@ -566,6 +648,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
       status,
       selected,
       removed,
+      nonLlama,
       select,
       refresh,
       streaming,

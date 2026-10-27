@@ -5,7 +5,7 @@ import type { InstalledModel } from "@/lib/ollama-types";
 
 /** Build an installed model the way `GET /api/tags` reports one. */
 function installed(name: string, parameterSize: string): InstalledModel {
-  return { name, size: 0, parameterSize };
+  return { name, size: 0, parameterSize, families: [] };
 }
 
 /**

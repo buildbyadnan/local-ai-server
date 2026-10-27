@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { allModels, modelsInTier, tiers } from "@/data/models";
 import { useOllama } from "@/components/ModelProvider";
+import { isLlamaModel } from "@/lib/family";
 import { isTextOnlyChat, matchInstalled } from "@/lib/match";
 import { PullButton, PullNote, PullStatus, StarterCta } from "@/components/Pull";
 
@@ -26,6 +27,7 @@ export default function AiModule() {
     status,
     selected,
     removed,
+    nonLlama,
     removedSessionModel,
     select,
     streaming,
@@ -37,9 +39,13 @@ export default function AiModule() {
   const [openTiers, setOpenTiers] = useState<string[]>(["30-70b"]);
   const wrapRef = useRef<HTMLDivElement>(null);
 
-  // Installed models this machine can actually chat with, by name.
+  // Chat candidates (M6): this is a Llama companion, so the picker shows
+  // only Llama-family models — gemma4:12b and friends live under OLLAMA,
+  // where they're the machine's business, not the chat's.
   const models = status
-    ? [...status.models].sort((a, b) => a.name.localeCompare(b.name))
+    ? status.models
+        .filter((model) => isLlamaModel(model.name, model.families))
+        .sort((a, b) => a.name.localeCompare(b.name))
     : [];
   const loaded = status?.loaded ?? [];
   // Guides this machine satisfies (§6 rules 1–3): chips, select-on-click
@@ -171,6 +177,12 @@ export default function AiModule() {
       {removed && (
         <p className="oremove">
           {removed} was removed — pick another model.
+        </p>
+      )}
+
+      {nonLlama && (
+        <p className="oremove" role="status">
+          {nonLlama} isn&apos;t used by this app — pick a Llama model to chat.
         </p>
       )}
 

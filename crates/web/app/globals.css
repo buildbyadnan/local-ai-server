@@ -245,6 +245,19 @@ a:focus-visible {
 .nav .item.on {
   color: var(--tx);
 }
+/* The Library entry is a real link — it must look and feel clickable
+   (the current page's span stays inert on purpose). */
+a.nav .item,
+.nav a.item {
+  cursor: pointer;
+}
+.nav a.item:hover {
+  color: var(--tx);
+}
+.nav a.item:focus-visible {
+  outline: 1px solid var(--g);
+  outline-offset: 2px;
+}
 .nav svg {
   width: 13px;
   height: 13px;
@@ -486,6 +499,15 @@ a:focus-visible {
   background: #0f2a14;
   color: var(--g);
   font-size: 9.5px;
+}
+/* M6: installed on the machine, but not a model this app chats with —
+   dashed and dim so the OLLAMA list stays truthful without inviting a
+   click the chat picker will refuse. */
+.omodel.other {
+  border-style: dashed;
+  border-color: var(--line);
+  background: #141714;
+  color: var(--dim);
 }
 .oact {
   display: flex;

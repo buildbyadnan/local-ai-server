@@ -12,6 +12,12 @@ export interface InstalledModel {
   size: number;
   /** `details.parameter_size` from Ollama, e.g. `8.0B` ("" if absent). */
   parameterSize: string;
+  /**
+   * `details.families` (folded with `details.family`) — the model's own
+   * declaring families, e.g. `["llama","text"]`. `[]` when the server
+   * sent none; the picker falls back to the name in that case (M6).
+   */
+  families: string[];
 }
 
 /** Response body of `GET /api/ollama/status`. Every field always present. */
