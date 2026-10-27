@@ -64,17 +64,13 @@ export function requireLoopbackHost(request: Request): Response | null {
 }
 
 /**
- * Guard 2 (POST routes): JSON content type, and — when a browser sends an
- * `Origin` — that origin must be loopback on the same port as this request.
- * Origin-absent requests (curl) pass; cross-site browser POSTs cannot
- * preflight through us because we send no CORS headers.
+ * Origin guard alone (for methods without a JSON body, e.g. DELETE):
+ * when a browser sends an `Origin`, it must be loopback on this port.
+ * Origin-absent requests (curl) pass; cross-site browser calls can't
+ * reach us because we send no CORS headers, and DELETE is not a
+ * no-cors-allowed method in the first place.
  */
-export function requireLocalPost(request: Request): Response | null {
-  const contentType = request.headers.get("content-type") ?? "";
-  if (!contentType.startsWith("application/json")) {
-    return jsonError(400, "Send JSON with Content-Type: application/json.");
-  }
-
+export function requireLocalOrigin(request: Request): Response | null {
   const origin = request.headers.get("origin");
   if (origin !== null) {
     if (origin === "null") {
@@ -94,6 +90,17 @@ export function requireLocalPost(request: Request): Response | null {
     }
   }
   return null;
+}
+
+/**
+ * Guard 2 (POST routes): JSON content type, plus the Origin check above.
+ */
+export function requireLocalPost(request: Request): Response | null {
+  const contentType = request.headers.get("content-type") ?? "";
+  if (!contentType.startsWith("application/json")) {
+    return jsonError(400, "Send JSON with Content-Type: application/json.");
+  }
+  return requireLocalOrigin(request);
 }
 
 /** Result of reading a request body: either a failure Response or the value. */

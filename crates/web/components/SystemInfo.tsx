@@ -157,6 +157,23 @@ export default function SystemInfo() {
                 <Row label="Next.js" value={report.runtime.next || "—"} />
                 <Row label="Server up for" value={formatDuration(report.runtime.uptimeSeconds)} />
               </Card>
+
+              <Card title="History">
+                {report.history === null && <Row label="Database" value="—" />}
+                {report.history && (
+                  <>
+                    <Row
+                      label="Saved chats"
+                      value={String(report.history.sessions)}
+                    />
+                    <Row
+                      label="Messages"
+                      value={String(report.history.messages)}
+                    />
+                    <Row label="Size" value={formatBytes(report.history.bytes)} />
+                  </>
+                )}
+              </Card>
             </div>
           )}
 

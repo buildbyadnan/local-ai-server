@@ -9,9 +9,11 @@
  * dialog can render honestly instead of erroring wholesale.
  */
 import { readFile, statfs } from "node:fs/promises";
+import { dirname } from "node:path";
 import os from "node:os";
 import nextPkg from "next/package.json";
 import { base, ollamaFetch, ollamaVersion, probeInstalled } from "@/lib/ollama";
+import { historyStats } from "@/lib/history-db";
 
 /** One installed-and-possibly-loaded model in the report. */
 export interface SystemModel {
@@ -55,6 +57,13 @@ export interface SystemReport {
     /** Data directory of the history DB (M7) — null until it exists. */
     dataDir: string | null;
   };
+  /** What the history DB holds (M7) — null when unreadable. */
+  history: {
+    sessions: number;
+    messages: number;
+    bytes: number;
+    file: string;
+  } | null;
 }
 
 /** `/etc/os-release` → its PRETTY_NAME, if present (pure). */
@@ -166,7 +175,18 @@ export async function collectSystem(): Promise<SystemReport> {
       uptimeSeconds: process.uptime(),
       dataDir: null,
     },
+    history: null,
   };
+
+  // The history DB (M7): counts + file size, and where it lives — but a
+  // read-only or broken data dir narrows the report instead of failing it.
+  try {
+    const stats = historyStats();
+    report.history = stats;
+    report.runtime.dataDir = dirname(stats.file);
+  } catch {
+    report.history = null;
+  }
 
   if (!probe.installed) return report;
 

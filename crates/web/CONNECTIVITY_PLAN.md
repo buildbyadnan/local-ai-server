@@ -579,6 +579,44 @@ visible, never in a tooltip.
   importer) switches to the store at M4. `filterSessions` moves wholesale —
   no dead copies.
 
+#### 5.5.1 M7 rework — the store moves server-side (normative)
+
+M7 replaces the localStorage blob as the *source of truth* with a
+`node:sqlite` file behind `/api/history`; everything above still governs
+what the user sees, with these deltas:
+
+- **Storage:** `crates/web/.data/history.db` (gitignored), WAL +
+  `busy_timeout`, opened by `lib/history-db.ts`. QA fleet servers each get
+  `HISTORY_DB_PATH=~/.cache/las-qa/db/history-<port>.db` so ports never
+  share history. The server owns `updated_at`; `title`/`created_at` are
+  frozen at first save and can never be renamed/backdated by a re-post.
+- **`localStorage["las.sessions.v1"]` is demoted to a read cache** (first
+  paint stays synchronous, no hydration flicker). On quota it deletes
+  *itself* — sessions live on disk now, so row 21's eviction ladder is
+  retired: the cache drops, the next load refetches.
+- **Cross-tab:** `BroadcastChannel("las.history")` → other tabs refetch;
+  the server row is the union, so row 19's merge/no-write-back dance is
+  replaced by refetch. Mutations serialize through one FIFO queue with a
+  `version` guard that discards a GET overtaken by a local write.
+- **Migration:** a profile still holding pre-server rows POSTs them once
+  as `{"import":[…]}` (its own timestamps preserved — the only path
+  allowed to set them), then records `las.migrated.v1` and always defers
+  to server truth. Import is an idempotent upsert by id, so a lost flag
+  can't duplicate rows.
+- **UI:** the raw-JSON `<pre>` and its `.jsonmeta` are **deleted** (§9 M7).
+  Search still filters rows and auto-opens the panel; each row gains an
+  inline `✕ → Delete/Keep` confirm, and under the list sit `Export JSON`
+  (Blob download of the visible history) and `Delete all` (modal requiring
+  the literal word `DELETE` before the button enables). Deleting the
+  *open* session calls `startNewChat()` — a stale conversation must not
+  re-save itself.
+- **Failure honesty:** a failed save flips the `saveError` notice (messages
+  stay on screen, retried at the next write point); a failed *read* keeps
+  the cache on screen — offline tolerance, not an error.
+- **Guards:** `/api/history` runs the full §3.3 order in every handler —
+  Host → Origin (plus JSON content type on POST; DELETE needs `?id=` or
+  `?all=1`) → body (32 MiB cap, migration-sized) → validation → disk.
+
 ---
 
 ## 6. Data model changes + tag mapping
@@ -682,9 +720,9 @@ own test uses `qwen2.5:7b`, `catalog.rs:417-430`); `llama3.2-vision:latest`
 | 16 | Chat while pulling | — | Allowed; background-download note | M3 |
 | 17 | Second pull attempted | provider `pulling` flag | Other Pull buttons disabled ("Pulling…") | M3 |
 | 18 | Selected model deleted externally | poll: name gone | Clear selection + "was removed — pick another model" | M1 |
-| 19 | Two tabs | `storage` event | Union by `updated_at`, no write-back, caps re-applied on save; selection shared | M4 |
-| 20 | localStorage corrupt | JSON.parse throws | Reset + welcome state | M4 |
-| 21 | localStorage full | QuotaExceededError | Evict oldest (floor 5) → honest notice | M4 |
+| 19 | Two tabs | `BroadcastChannel("las.history")` | Other tabs refetch; server row is the union (M7 retires the storage-event merge); selection sharing unchanged until M8 | M4 → M7 |
+| 20 | History cache corrupt (localStorage) | JSON.parse throws | Cache resets to `[]`, server truth refetches → welcome state | M4 → M7 |
+| 21 | localStorage full (cache write) | QuotaExceededError | Cache deletes **itself**; sessions live in the DB, next load refetches (no eviction) | M4 → M7 |
 | 22 | Wrong OLLAMA_HOST | — | Folded into row 2 | — |
 | 23 | Very long response | — | Internal scroll + auto-scroll (existing) | M2 |
 | 24 | Non-ASCII/emoji streaming | TextDecoder stream mode | Renders correctly | M2 |
@@ -700,7 +738,7 @@ own test uses `qwen2.5:7b`, `catalog.rs:417-430`); `llama3.2-vision:latest`
 | 34 | First send after restore | restored session open | Appends to it; `created_at`/`title` frozen; `model` stamped | M4 |
 | 35 | Stop/error reply must survive reload | write points §5.5(c) | Session written on any stream end | M4 |
 | 36 | Restore with uninstalled model | `session.model ∉ models` | Read-only messages + row-18 notice, input disabled until a model is picked | M4 |
-| 37 | Hydration | `hydrated === false` | Skeleton in `<pre>` **and meta** — no "No chats yet"/"0 sessions" flash | M4 |
+| 37 | Hydration | `hydrated === false` | Skeleton in the meta line — no "No chats yet"/"0 sessions" flash (first client snapshot reads the cache synchronously, so the window is one frame) | M4 → M7 |
 | 38 | Stream active + session row / `＋ New chat` clicked | stream state | `aria-disabled` + "Stop the reply first" | M2 |
 | 39 | System info unreadable | `/api/system` 5xx/network | "Couldn't read this machine's details — try again." + Refresh (dialog stays open) | M5 |
 | 40 | Update check can't reach GitHub | fetch fails / 403 / 429 | Honest reason in the dialog; a version is only ever shown when one was actually read | M5 |
@@ -711,6 +749,10 @@ own test uses `qwen2.5:7b`, `catalog.rs:417-430`); `llama3.2-vision:latest`
 | 45 | Show models while Ollama is down | `status.running === false` | "Ollama isn't running at {host}…" — no fabricated list | M5 |
 | 46 | Clipboard write refused | permission / insecure context | Button says "Couldn't copy" and the command stays selectable — never a false "Copied ✓" | M5 |
 | 47 | Non-Llama model is the persisted/open selection | `isLlamaModel(name, families)` false | Selection cleared (key removed), blocked from auto-pick, "{model} isn't used by this app — pick a Llama model to chat." until the user picks | M6 |
+| 48 | History save POST fails (server down mid-chat) | fetch rejects / 5xx | Optimistic row kept on screen + saveError notice; next write point retries; a later success clears the notice | M7 |
+| 49 | History GET fails (server unreachable) | fetch rejects / 5xx | Cache stays on screen, no error notice — a failed *read* is offline tolerance, not data loss | M7 |
+| 50 | Delete-all attempted without the typed word | button `disabled` until value === "DELETE"; server requires `?all=1` | No wipe (client-side gate + server-side contract); lowercase word rejected | M7 |
+| 51 | History API called cross-origin or from a foreign Host | §3.3 guards, every handler | 403 before any body read or disk touch (same order as the Ollama routes) | M7 |
 
 ---
 
@@ -736,9 +778,13 @@ quoted)
 | Pull confirm (>30B) | hardcoded `≈245 GB` | "This one is huge (≈{pullSize}) — bigger than anything the llama CLI recommends. Pull anyway / Cancel." (size interpolated; trigger `max(paramsBillions) > 30`) |
 | Pull cancel | "partial download resumes later" | "Download stopped. Ollama may pick it back up next time." |
 | Warm-up | "Warming up <model>…" | "Warming up llama3.1:8b — the first reply takes a few seconds." |
-| History meta (normal) | "N of M sessions" | "**N sessions** — stored in this browser" |
+| History meta (normal) | "N of M sessions" | "**N sessions** — saved on this machine" (M7; was "stored in this browser") |
 | History meta (query active) | "N of M … matching" + "— raw JSON" | "**N of M** sessions matching \"q\"" |
-| History empty | bare `[]` | `// No chats yet — messages you send are saved in this browser only.` above `[]`; `// No sessions match "q".` on zero results; skeleton until hydrated |
+| History empty | bare `[]` / raw JSON | "No chats yet — messages you send are saved on this machine." (no JSON rendered at all since M7); "No sessions match \"q\"." on zero results; skeleton until hydrated |
+| History delete (per row) | none | `✕` with `aria-label="Delete chat "{title}""` → inline "**Delete** / **Keep**" confirm |
+| History delete all | none | Modal `Delete all history`: "Every saved chat on this machine will be deleted — this can't be undone. Export JSON first if you want a copy." + "Type **DELETE** to confirm." → buttons "Delete everything" / "Cancel" (disabled until the input is exactly `DELETE`) |
+| History export | none | Button "**Export JSON**" → downloads `chat-history-YYYY-MM-DD.json` |
+| History save failure | "Couldn't save this chat (browser storage is full)." | "Couldn't save that change to chat history — your messages stay on screen; it will be retried on the next save." (M7 — the DB, not a quota, is now the failure mode) |
 | Context overflow | "Retry" | "This chat is too long for the model's memory. Start a new chat." + button |
 | Payload >1 MiB | (none) | "This chat is too long to send — start a new chat." |
 | No-models CTA | "Pull a starter model (llama3.2:3b)" | "No models yet — get the default pick: llama3.1:8b (about 4.9 GB). Prefer smaller? llama3.2:3b (about 2 GB)." |
@@ -747,7 +793,8 @@ Also normative as quoted elsewhere in this plan: `Switch / Cancel` (§5.2),
 "Pulling…" (§5.4), "jump to picker" (§5.1), "Stop the reply first" (§5.5),
 "Couldn't save this chat (browser storage is full)." (§5.5), the read-only
 restore notice (§5.5 + row 36), "A model is downloading in the background."
-(§5.4).
+(§5.4), "Delete all history" + the typed-`DELETE` confirmation and
+"Export JSON" (§5.5.1 + §8 M7 row), "AI History" (the panel toggle label).
 
 **Milestone copy notes (recorded as each milestone ships):**
 - **M1:** the `.empty` row's M1 sentence shipped as the *disabled input's*
@@ -816,6 +863,16 @@ Voice check at M4: the section must read like `llama`'s guided recommender
   but non-Llama chips render dashed/dim with a "Not used by this app"
   tooltip and the models dialog appends "· not used by this app" to the
   row: visible, deletable, never chat-selectable.
+- **M7:** the history panel never renders JSON again. The meta line says
+  "**N sessions** — saved on this machine" (the machine, not "this
+  browser" — the DB is shared by every profile); the empty state is the
+  plain sentence "No chats yet — messages you send are saved on this
+  machine."; the save-failure notice names the retry ("…your messages
+  stay on screen; it will be retried on the next save."); the wipe modal
+  is the §8 "History delete all" row verbatim, and its button only
+  enables on an exact `DELETE`. Deleting a row shows an inline
+  **Delete / Keep** pair — no dialog for one chat, a typed confirm for
+  all of them.
 
 ---
 
@@ -894,8 +951,10 @@ Voice check at M4: the section must read like `llama`'s guided recommender
   chat. *Done when:* `gemma4:12b` is absent from `#model-picker`, present in
   the OLLAMA model list, and `matchInstalled`/guides are unchanged.
 - **M7 — Server-side history + human history UI.** `node:sqlite` store
-  (`crates/web/.data/history.db`, WAL), `GET/POST/DELETE /api/history`,
-  one-time migration of `las.sessions.v1`, localStorage demoted to a read
+  (`crates/web/.data/history.db`, WAL; `HISTORY_DB_PATH` overrides it —
+  the QA fleet points each port at its own file), `GET/POST/DELETE
+  /api/history`, one-time migration of `las.sessions.v1`, localStorage
+  demoted to a read
   cache, cross-tab via `BroadcastChannel`, and the raw-JSON `<pre>` **and
   its copy rows deleted** — replaced by searchable session cards with
   per-row delete, delete-all (typed confirm) and export. *Done when:* two

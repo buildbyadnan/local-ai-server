@@ -1,25 +1,35 @@
 /**
- * Browser-persisted chat history (CONNECTIVITY_PLAN §5.5).
+ * Chat history (CONNECTIVITY_PLAN §5.5, reworked by §9 M7).
  *
  * Two halves, both pure enough to unit-test:
  * - the **types + helpers** the UI shares (`titleFrom`, `filterSessions`,
- *   `formatRelative`, `mergeSessions`, `capSessions`),
- * - a tiny **external store** over `localStorage["las.sessions.v1"]` that
- *   components subscribe to with `useSyncExternalStore`.
+ *   `formatRelative`, `mergeSessions`, `capSessions`, `sanitizeSessions`);
+ * - a tiny **external store** over the server's `/api/history` SQLite DB,
+ *   subscribed to with `useSyncExternalStore`.
  *
- * The store shape is what makes the §5.5 rules fall out for free:
- * - server snapshot `null` → row 37's hydration skeleton, and the first
- *   client render matches SSR exactly;
- * - the storage read happens once inside `getSnapshot` (client-only — the
- *   server snapshot returns before touching `window`), never in an effect,
- *   because `react-hooks/set-state-in-effect` forbids the setState an
- *   effect-based read would need;
- * - a `storage` event from another tab **merges in place and never writes
- *   back** (row 19's no-loop rule; removals are not back-propagated — the
- *   documented limitation of that rule);
- * - corrupt JSON resets to `[]` + the welcome state (row 20);
- * - a quota failure evicts the oldest sessions down to a floor of 5, and
- *   only if that still fails flips the honest `saveError` notice (row 21).
+ * Why the store now talks to the server instead of owning a
+ * `localStorage` blob (§9 M7):
+ * - **cross-profile truth**: every Chrome profile on this machine shares
+ *   one history file through the API; localStorage is demoted to a *read
+ *   cache* so first paint is still synchronous and flicker-free;
+ * - **cross-tab truth**: mutations broadcast on `las.history` and the
+ *   other tabs refetch — the server's row is the union, so row 19's
+ *   "merge two divergent blobs" dance is no longer needed;
+ * - **no quota cliff**: row 21's eviction ladder existed only because
+ *   localStorage caps at ~5 MB; the cache now *drops itself* on quota
+ *   instead of dropping sessions, because the sessions live on disk.
+ *
+ * Store shape (unchanged contract for the components):
+ * - server snapshot `null` → row 37's hydration skeleton; first client
+ *   snapshot reads the cache synchronously (never in an effect —
+ *   `react-hooks/set-state-in-effect` forbids an effect-based read);
+ * - `saveSession` applies optimistically, then POSTs through a single
+ *   FIFO queue so writes can't interleave; the server's stamp replaces
+ *   the optimistic row only when nothing newer happened meanwhile;
+ * - a failed write flips the honest `saveError` notice; a failed *read*
+ *   keeps the cache (offline tolerance, not an error);
+ * - migration: a profile that still holds pre-server sessions POSTs them
+ *   once (`las.migrated.v1`), then always defers to server truth.
  */
 
 export interface ChatMessage {
@@ -42,14 +52,17 @@ export interface ChatSession {
   messages: ChatMessage[];
 }
 
+/** The localStorage key — now a **read cache** of the server's rows (M7). */
 export const SESSIONS_KEY = "las.sessions.v1";
-/** §5.5 caps — re-applied on load and on every local save. */
+/** One-time-per-profile migration marker (M7). */
+export const MIGRATED_KEY = "las.migrated.v1";
+/** Cross-tab signal: "history changed on the server, please refetch". */
+export const HISTORY_CHANNEL = "las.history";
+/** §5.5 caps — enforced server-side, mirrored when caching (M7). */
 export const MAX_SESSIONS = 20;
 export const MAX_MESSAGES = 100;
 
 const TITLE_CUT = 60;
-/** Row 21 — below this many sessions, quota eviction gives up and says so. */
-const QUOTA_FLOOR = 5;
 
 /** First user message, whitespace collapsed, hard-cut at 60 chars. */
 export function titleFrom(firstUserMessage: string): string {
@@ -98,7 +111,7 @@ function newer(a: ChatSession, b: ChatSession): number {
   return b.id.localeCompare(a.id);
 }
 
-/** Union two lists by id (multi-tab `storage` event) — newest copy wins. */
+/** Union two lists by id — newest copy wins (still used for optimistic folds). */
 export function mergeSessions(
   a: ChatSession[],
   b: ChatSession[],
@@ -112,9 +125,9 @@ export function mergeSessions(
 }
 
 /**
- * §5.5 caps in one pure place (load and save share it): keep the newest
- * 20 sessions, drop the oldest messages past 100 per session, recompute
- * `message_count`, and return the list newest-first.
+ * §5.5 caps in one pure place (cache writes and imports share it): keep
+ * the newest 20 sessions, drop the oldest messages past 100 per session,
+ * recompute `message_count`, and return the list newest-first.
  */
 export function capSessions(sessions: ChatSession[]): ChatSession[] {
   return sessions
@@ -126,8 +139,12 @@ export function capSessions(sessions: ChatSession[]): ChatSession[] {
     .slice(0, MAX_SESSIONS);
 }
 
-/** Shape-validate stored JSON; any bad field treats the whole blob as corrupt. */
-function sanitize(raw: unknown): ChatSession[] | null {
+/**
+ * Shape-validate a session array (cache reads and API responses share it);
+ * any bad field treats the whole blob as corrupt — the server is trusted
+ * to send well-formed rows, and stale cache junk must not render half a UI.
+ */
+export function sanitizeSessions(raw: unknown): ChatSession[] | null {
   if (!Array.isArray(raw)) return null;
   const sessions: ChatSession[] = [];
   for (const entry of raw) {
@@ -175,35 +192,54 @@ export function newSessionId(): string {
   return `ses_${globalThis.crypto?.randomUUID?.() ?? `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 8)}`}`;
 }
 
-type Listener = () => void;
+/* ───────────────────────── store over /api/history ───────────────────── */
 
-let snapshot: ChatSession[] | null = null; // null until storage is read once
+type Listener = () => void;
+type Json = Record<string, unknown>;
+
+const API = "/api/history";
+
+let snapshot: ChatSession[] | null = null; // null until the cache is read once
 let saveError = false;
+/** Bumped by every local mutation; stale async results check against it. */
+let version = 0;
+/** FIFO of API mutations — writes can never interleave (single-writer story). */
+let queue: Promise<void> = Promise.resolve();
+let channel: BroadcastChannel | null = null;
 const listeners = new Set<Listener>();
 
 function emit(): void {
   for (const listener of listeners) listener();
 }
 
-/** First (client) read: empty storage → `[]`, corrupt storage → reset. */
-function readStorage(): ChatSession[] {
+function storage(): Storage | null {
+  try {
+    return window.localStorage; // null only where storage is unavailable
+  } catch {
+    return null;
+  }
+}
+
+/** Read the cache once: empty → `[]`, corrupt → reset (row 20). */
+function readCache(): ChatSession[] {
+  const store = storage();
+  if (store === null) return [];
   let stored: string | null = null;
   try {
-    stored = window.localStorage.getItem(SESSIONS_KEY);
+    stored = store.getItem(SESSIONS_KEY);
   } catch {
-    return []; // storage unavailable — the app still works, nothing persists
+    return [];
   }
   if (stored === null) return [];
   let sessions: ChatSession[] | null = null;
   try {
-    sessions = sanitize(JSON.parse(stored));
+    sessions = sanitizeSessions(JSON.parse(stored));
   } catch {
     sessions = null;
   }
   if (sessions !== null) return sessions;
-  // Row 20: corrupt JSON resets to the welcome state.
   try {
-    window.localStorage.removeItem(SESSIONS_KEY);
+    store.removeItem(SESSIONS_KEY); // row 20: corrupt → welcome state
   } catch {
     // nothing to reset if storage is unavailable
   }
@@ -211,32 +247,127 @@ function readStorage(): ChatSession[] {
 }
 
 /**
- * Persist, evicting the oldest sessions on quota failure (row 21). Returns
- * the list that actually landed on disk — eviction may have trimmed it —
- * and whether anything landed at all.
+ * Mirror the snapshot into the cache (best-effort). On quota the cache
+ * deletes *itself* rather than evicting sessions — sessions live in the
+ * DB now, and the next load refetches them (row 21's ladder is retired).
  */
-function write(capped: ChatSession[]): { sessions: ChatSession[]; saved: boolean } {
-  let candidate = capped;
-  for (;;) {
+function writeCache(sessions: ChatSession[]): void {
+  const store = storage();
+  if (store === null) return;
+  try {
+    store.setItem(SESSIONS_KEY, JSON.stringify(capSessions(sessions)));
+  } catch {
     try {
-      window.localStorage.setItem(SESSIONS_KEY, JSON.stringify(candidate));
-      return { sessions: candidate, saved: true };
+      store.removeItem(SESSIONS_KEY);
     } catch {
-      if (candidate.length <= QUOTA_FLOOR) return { sessions: capped, saved: false };
-      candidate = candidate.slice(0, -1); // drop the oldest and retry
+      // storage unavailable entirely — reads will just refetch
     }
   }
 }
 
-/** Local save: caps re-applied, quota guarded, subscribers notified. */
-function save(next: ChatSession[]): void {
-  const result = write(capSessions(next));
-  snapshot = result.sessions;
-  saveError = !result.saved;
+function migratedFlag(): boolean {
+  try {
+    return storage()?.getItem(MIGRATED_KEY) === "1";
+  } catch {
+    return true; // can't record a marker → skip migration (refetch still works)
+  }
+}
+
+function setMigratedFlag(): void {
+  try {
+    storage()?.setItem(MIGRATED_KEY, "1");
+  } catch {
+    // best-effort: a lost flag re-imports idempotently (upsert by id)
+  }
+}
+
+/** Apply a local mutation: bump version, update snapshot+cache, notify. */
+function applyLocal(next: ChatSession[]): void {
+  version += 1;
+  snapshot = capSessions(next);
+  writeCache(snapshot);
   emit();
 }
 
-/** One §5.5 write: create the session on first send, otherwise update it. */
+/** Run one API mutation in FIFO order; the queue itself never rejects. */
+function enqueue<T>(op: () => Promise<T>): Promise<T> {
+  const run = queue.then(op);
+  queue = run.then(
+    () => undefined,
+    () => undefined,
+  );
+  return run;
+}
+
+/** Tell the other tabs the server moved — they refetch on receipt. */
+function notifyOthers(): void {
+  try {
+    channel?.postMessage({ t: "history" });
+  } catch {
+    // channel closed mid-flight: nobody to tell
+  }
+}
+
+function setSaveError(value: boolean): void {
+  if (saveError === value) return;
+  saveError = value;
+  emit();
+}
+
+async function apiJson(
+  path: string,
+  init?: RequestInit,
+): Promise<Json | unknown | null> {
+  const response = await fetch(path, { cache: "no-store", ...init });
+  if (!response.ok) throw new Error(`HTTP ${response.status}`);
+  return (await response.json()) as Json | unknown | null;
+}
+
+/**
+ * Reconcile with the server: one-time migration first (this profile's
+ * legacy localStorage rows, preserving their real timestamps), then GET.
+ * A stale response — a local mutation happened while we waited — is
+ * discarded; the optimistic snapshot is newer than any server echo.
+ */
+async function refresh(): Promise<void> {
+  const stamp = version;
+  try {
+    if (!migratedFlag()) {
+      const legacy = readCache();
+      if (legacy.length > 0) {
+        await enqueue(async () => {
+          // Re-check *inside* the queue: two refreshes can both see the
+          // unset flag, but only the first to run may POST the import.
+          if (migratedFlag()) return;
+          const result = await apiJson(API, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ import: legacy }),
+          });
+          const imported = (result as { imported?: unknown } | null)?.imported;
+          if (typeof imported === "number") setMigratedFlag();
+        });
+      } else {
+        setMigratedFlag(); // nothing to move — remember we checked
+      }
+    }
+    const body = await enqueue(async () => apiJson(API));
+    const list = sanitizeSessions(
+      Array.isArray(body) ? body : (body as Json | null)?.sessions,
+    );
+    if (list === null) throw new Error("malformed history payload");
+    if (stamp !== version) return; // a local write won the race — keep it
+    version += 1;
+    snapshot = list;
+    writeCache(list);
+    emit();
+  } catch {
+    // Server unreachable/broken: the cache stays on screen (read caches
+    // exist for exactly this). Write failures surface via saveError.
+  }
+}
+
+/** One §5.5 write: optimistic locally, authoritative on the server. */
 function saveSession(draft: {
   id: string;
   model: string;
@@ -246,7 +377,7 @@ function saveSession(draft: {
   const now = new Date().toISOString();
   const previous = current.find((session) => session.id === draft.id) ?? null;
   const messages = draft.messages.slice(-MAX_MESSAGES);
-  const session: ChatSession = {
+  const optimistic: ChatSession = {
     id: draft.id,
     // (a) title from the first user message; created_at/title frozen after.
     title:
@@ -254,40 +385,105 @@ function saveSession(draft: {
       titleFrom(draft.messages.find((m) => m.role === "user")?.content ?? ""),
     model: draft.model,
     created_at: previous?.created_at ?? now,
-    updated_at: now, // (b) stamped on every save
+    updated_at: now,
     message_count: messages.length,
     messages,
   };
-  save([session, ...current.filter((s) => s.id !== draft.id)]);
-  return session;
+  applyLocal([optimistic, ...current.filter((s) => s.id !== draft.id)]);
+
+  const stamp = version;
+  void enqueue(async () => {
+    try {
+      const body = (await apiJson(API, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ id: draft.id, model: draft.model, messages }),
+      })) as { session?: unknown } | null;
+      const saved = sanitizeSessions([body?.session])?.[0];
+      if (saved && stamp === version) {
+        // Server's row (its updated_at/title freeze) replaces ours — but
+        // only when nothing local happened after this save was queued.
+        version += 1;
+        snapshot = mergeSessions(snapshot ?? [], [saved]);
+        writeCache(snapshot);
+        emit();
+      }
+      setSaveError(false);
+    } catch {
+      setSaveError(true); // honest notice; messages stay on screen
+    } finally {
+      notifyOthers();
+    }
+  });
+  return optimistic;
 }
 
-/** Another tab wrote the list: merge in place, never write back (row 19). */
-function onStorage(event: StorageEvent): void {
-  if (event.key !== SESSIONS_KEY || event.newValue === null) return;
-  let incoming: ChatSession[] | null = null;
-  try {
-    incoming = sanitize(JSON.parse(event.newValue));
-  } catch {
-    incoming = null;
-  }
-  if (incoming === null) return; // corrupt from elsewhere: keep what we have
-  snapshot = mergeSessions(snapshot ?? [], incoming);
-  emit();
+/** Delete one session: optimistic now, server-confirmed, refetch on error. */
+function deleteSession(id: string): void {
+  const current = getSnapshot() ?? [];
+  if (!current.some((session) => session.id === id)) return;
+  applyLocal(current.filter((session) => session.id !== id));
+  void enqueue(async () => {
+    try {
+      await apiJson(`${API}?id=${encodeURIComponent(id)}`, { method: "DELETE" });
+      setSaveError(false);
+    } catch {
+      setSaveError(true);
+      await refresh(); // server still has it — show the truth again
+    } finally {
+      notifyOthers();
+    }
+  });
+}
+
+/** Delete everything (the typed-confirm path). */
+function deleteAll(): void {
+  applyLocal([]);
+  void enqueue(async () => {
+    try {
+      await apiJson(`${API}?all=1`, { method: "DELETE" });
+      setSaveError(false);
+    } catch {
+      setSaveError(true);
+      await refresh();
+    } finally {
+      notifyOthers();
+    }
+  });
+}
+
+/** Another tab's mutation landed: reconcile with the server. */
+function onMessage(): void {
+  void refresh();
 }
 
 function subscribe(listener: Listener): () => void {
   listeners.add(listener);
-  if (listeners.size === 1) window.addEventListener("storage", onStorage);
+  if (listeners.size === 1) {
+    try {
+      channel = new BroadcastChannel(HISTORY_CHANNEL);
+      channel.onmessage = onMessage;
+    } catch {
+      channel = null; // no cross-tab channel (very old browser) — still works
+    }
+    void refresh(); // first subscriber owns the initial server read
+  }
   return () => {
     listeners.delete(listener);
-    if (listeners.size === 0) window.removeEventListener("storage", onStorage);
+    if (listeners.size === 0) {
+      try {
+        channel?.close();
+      } catch {
+        // already closed
+      }
+      channel = null;
+    }
   };
 }
 
 function getSnapshot(): ChatSession[] | null {
   if (typeof window === "undefined") return null; // never touch storage in SSR
-  if (snapshot === null) snapshot = readStorage();
+  if (snapshot === null) snapshot = readCache(); // synchronous first paint
   return snapshot;
 }
 
@@ -300,4 +496,8 @@ export const historyStore = {
   getSaveError: (): boolean => saveError,
   getSaveErrorServerSnapshot: (): boolean => false,
   saveSession,
+  deleteSession,
+  deleteAll,
+  /** Exposed for tests and the export button's "refresh first" option. */
+  refresh,
 };

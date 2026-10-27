@@ -2,8 +2,14 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { filterSessions, formatRelative } from "@/lib/history";
+import {
+  filterSessions,
+  formatRelative,
+  historyStore,
+  type ChatSession,
+} from "@/lib/history";
 import { useOllama } from "@/components/ModelProvider";
+import Modal from "@/components/Modal";
 import OllamaStatus from "@/components/OllamaStatus";
 import SystemInfo from "@/components/SystemInfo";
 
@@ -53,27 +59,55 @@ export default function Sidebar() {
     saveError,
   } = useOllama();
   const [open, setOpen] = useState(false);
+  /** Which row is waiting for its inline delete confirmation, if any. */
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
+  /** The typed-confirm wipe dialog (M7). */
+  const [wipeOpen, setWipeOpen] = useState(false);
+  const [wipeWord, setWipeWord] = useState("");
 
-  // Typing in the search box auto-opens the raw JSON view.
+  // Typing in the search box auto-opens the session list.
   const effectiveOpen = open || query.trim().length > 0;
 
   const hydrated = sessions !== null;
   const matches = filterSessions(sessions ?? [], query);
 
-  // The <pre> is never search-scoped (§5.5): it shows the open session's
-  // JSON, or the honest empty/zero-result/skeleton states (row 37). An
-  // empty query returns every session, so zero matches implies a query.
-  const json = !hydrated
-    ? "…"
-    : sessions.length === 0
-      ? "// No chats yet — messages you send are saved in this browser only.\n[]"
-      : matches.length === 0
-        ? `// No sessions match "${query.trim()}".`
-        : JSON.stringify(
-            sessions.find((s) => s.id === activeSessionId) ?? sessions[0],
-            null,
-            2,
-          );
+  /** Download the current history as readable JSON (M7). */
+  function exportHistory() {
+    const blob = new Blob([JSON.stringify(sessions ?? [], null, 2)], {
+      type: "application/json",
+    });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `chat-history-${new Date().toISOString().slice(0, 10)}.json`;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    window.setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
+
+  /** Row ✕ → inline confirm. Deleting the open chat starts a fresh one. */
+  function confirmDelete(session: ChatSession) {
+    setPendingDelete(null);
+    const wasActive = session.id === activeSessionId;
+    historyStore.deleteSession(session.id);
+    // The open conversation would keep its messages on screen and re-save
+    // them at the next write point — a fresh chat is the honest outcome.
+    if (wasActive) startNewChat();
+  }
+
+  /** Typed-confirm wipe: clear the DB and start a fresh chat. */
+  function confirmWipe() {
+    historyStore.deleteAll();
+    startNewChat();
+    setWipeOpen(false);
+    setWipeWord("");
+  }
+
+  function closeWipe() {
+    setWipeOpen(false);
+    setWipeWord("");
+  }
 
   return (
     <aside className="panel side" aria-label="Sidebar">
@@ -160,7 +194,7 @@ export default function Sidebar() {
 
       {effectiveOpen && (
         <>
-          <p className="jsonmeta">
+          <p className="histnote">
             {!hydrated ? (
               "…"
             ) : query.trim() ? (
@@ -175,42 +209,136 @@ export default function Sidebar() {
                 <strong>
                   {sessions.length} session{sessions.length === 1 ? "" : "s"}
                 </strong>{" "}
-                — stored in this browser
+                — saved on this machine
               </>
             )}
           </p>
           {saveError && (
             <p className="saveerr">
-              Couldn&apos;t save this chat (browser storage is full).
+              Couldn&apos;t save that change to chat history — your messages
+              stay on screen; it will be retried on the next save.
+            </p>
+          )}
+          {hydrated && sessions.length === 0 && !query.trim() && (
+            <p className="histnote">
+              No chats yet — messages you send are saved on this machine.
+            </p>
+          )}
+          {hydrated && matches.length === 0 && query.trim() && (
+            <p className="histnote">
+              No sessions match &quot;{query.trim()}&quot;.
             </p>
           )}
           {hydrated && matches.length > 0 && (
             <div className="histlist">
               {matches.map((session) => (
-                <button
+                <div
                   key={session.id}
-                  type="button"
                   className={`histrow${session.id === activeSessionId ? " on" : ""}`}
-                  aria-current={
-                    session.id === activeSessionId ? "true" : undefined
-                  }
-                  disabled={streaming}
-                  aria-disabled={streaming}
-                  title={streaming ? "Stop the reply first" : undefined}
-                  onClick={() => openSession(session.id)}
                 >
-                  <span className="htitle">{session.title}</span>
-                  <span className="hmeta">
-                    {session.model} · {formatRelative(session.updated_at)}
-                  </span>
-                </button>
+                  <button
+                    type="button"
+                    className="histopen"
+                    aria-current={
+                      session.id === activeSessionId ? "true" : undefined
+                    }
+                    disabled={streaming}
+                    aria-disabled={streaming}
+                    title={streaming ? "Stop the reply first" : undefined}
+                    onClick={() => openSession(session.id)}
+                  >
+                    <span className="htitle">{session.title}</span>
+                    <span className="hmeta">
+                      {session.model} · {formatRelative(session.updated_at)} ·{" "}
+                      {session.message_count} message
+                      {session.message_count === 1 ? "" : "s"}
+                    </span>
+                  </button>
+                  {pendingDelete === session.id ? (
+                    <span className="hconfirm">
+                      <button
+                        type="button"
+                        className="btn danger"
+                        onClick={() => confirmDelete(session)}
+                      >
+                        Delete
+                      </button>
+                      <button
+                        type="button"
+                        className="btn"
+                        onClick={() => setPendingDelete(null)}
+                      >
+                        Keep
+                      </button>
+                    </span>
+                  ) : (
+                    <button
+                      type="button"
+                      className="hdel"
+                      aria-label={`Delete chat “${session.title}”`}
+                      title="Delete this chat"
+                      disabled={streaming}
+                      aria-disabled={streaming}
+                      onClick={() => setPendingDelete(session.id)}
+                    >
+                      ✕
+                    </button>
+                  )}
+                </div>
               ))}
             </div>
           )}
-          <pre className="json" tabIndex={0} aria-label="Chat history as JSON">
-            {json}
-          </pre>
+          {hydrated && sessions.length > 0 && (
+            <div className="hactions">
+              <button type="button" className="btn" onClick={exportHistory}>
+                Export JSON
+              </button>
+              <button
+                type="button"
+                className="btn danger"
+                disabled={streaming}
+                aria-disabled={streaming}
+                title={streaming ? "Stop the reply first" : undefined}
+                onClick={() => setWipeOpen(true)}
+              >
+                Delete all
+              </button>
+            </div>
+          )}
         </>
+      )}
+
+      {wipeOpen && (
+        <Modal title="Delete all history" onClose={closeWipe}>
+          <p className="omodal-p">
+            Every saved chat on this machine will be deleted — this
+            can&apos;t be undone. Export JSON first if you want a copy.
+          </p>
+          <p className="omodal-p">
+            Type <strong>DELETE</strong> to confirm.
+          </p>
+          <input
+            className="wipeinput"
+            value={wipeWord}
+            onChange={(event) => setWipeWord(event.target.value)}
+            placeholder="DELETE"
+            aria-label="Type DELETE to confirm"
+            autoFocus
+          />
+          <div className="oact">
+            <button
+              type="button"
+              className="btn danger"
+              disabled={wipeWord !== "DELETE"}
+              onClick={confirmWipe}
+            >
+              Delete everything
+            </button>
+            <button type="button" className="btn" onClick={closeWipe}>
+              Cancel
+            </button>
+          </div>
+        </Modal>
       )}
     </aside>
   );

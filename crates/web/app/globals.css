@@ -294,44 +294,11 @@ a.nav .item,
 .histbtn[aria-expanded="true"] .chev {
   color: var(--g);
 }
-.jsonmeta {
+.histnote {
   color: var(--dim);
   font-size: 9.5px;
   margin-top: 6px;
   line-height: 1.5;
-}
-.json {
-  margin-top: 6px;
-  min-height: 140px;
-  overflow: auto;
-  background: #0a0c0a;
-  border: 1px solid var(--line);
-  border-radius: 10px;
-  padding: 10px;
-  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 10.5px;
-  line-height: 1.6;
-  color: #9fd8a8;
-  white-space: pre-wrap;
-  overflow-wrap: anywhere;
-  word-break: break-word;
-  tab-size: 2;
-  scrollbar-width: thin;
-  scrollbar-color: #2a2d2a transparent;
-}
-.json::-webkit-scrollbar {
-  width: 6px;
-  height: 6px;
-}
-.json::-webkit-scrollbar-thumb {
-  background: #2a2d2a;
-  border-radius: 6px;
-}
-/* The <pre> is tabbable so it can be scrolled by keyboard — it needs the
-   same visible focus indicator the buttons and inputs have. */
-.json:focus-visible {
-  outline: 2px solid var(--g);
-  outline-offset: 2px;
 }
 .saveerr {
   margin-top: 6px;
@@ -339,8 +306,10 @@ a.nav .item,
   font-size: 9.5px;
   line-height: 1.5;
 }
-/* Session rows above the raw JSON — the list scrolls internally so 20
-   sessions can't blow the sidebar (§5.5 space math, §10.5 space pass). */
+/* Session list (M7): searchable cards with a per-row delete — the raw
+   JSON <pre> this replaces was the non-technical user's least favourite
+   feature (§9 M7). The list scrolls internally so 20 sessions can't blow
+   the sidebar (§5.5 space math, §10.5 space pass). */
 .histlist {
   display: flex;
   flex-direction: column;
@@ -354,17 +323,14 @@ a.nav .item,
 }
 .histrow {
   display: flex;
-  flex-direction: column;
-  gap: 2px;
+  align-items: center;
+  gap: 4px;
   width: 100%;
-  padding: 7px 9px;
   border: 1px solid var(--line);
   border-radius: 9px;
   background: #161916;
   color: var(--tx);
   font-size: 11px;
-  text-align: left;
-  cursor: pointer;
 }
 .histrow:hover {
   border-color: #2e8a3d;
@@ -373,12 +339,93 @@ a.nav .item,
   border-color: #2e8a3d;
   background: #0f2a14;
 }
-.histrow:disabled {
+/* The card itself is a button (open); the ✕ sits beside it — a button can
+   never nest inside a button, so the row is a container, not a button. */
+.histopen {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding: 7px 9px;
+  border: none;
+  border-radius: 9px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.histopen:disabled {
   opacity: 0.55;
   cursor: default;
 }
-.histrow:focus-visible {
+.histopen:focus-visible {
   outline: 1px solid var(--g);
+  outline-offset: -1px;
+}
+.hdel {
+  flex: none;
+  margin-right: 6px;
+  padding: 3px 6px;
+  border: 1px solid transparent;
+  border-radius: 7px;
+  background: none;
+  color: var(--dim);
+  font-size: 10px;
+  line-height: 1;
+  cursor: pointer;
+}
+.hdel:hover {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+.hdel:focus-visible {
+  outline: 1px solid var(--g);
+  outline-offset: 1px;
+}
+.hdel:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+/* Inline "delete this one?" confirmation — names the action, no dialog
+   needed for a single row (the wipe still gets the typed confirm). */
+.hconfirm {
+  display: flex;
+  flex: none;
+  gap: 4px;
+  margin-right: 6px;
+}
+.hconfirm .btn {
+  padding: 3px 7px;
+  font-size: 9.5px;
+}
+/* Export / delete-all live under the list, always visible (M7). */
+.hactions {
+  display: flex;
+  gap: 6px;
+  margin-top: 8px;
+}
+.hactions .btn {
+  flex: 1;
+  padding: 5px 7px;
+  font-size: 10px;
+}
+/* The typed confirmation field in the wipe dialog — uppercase letters so
+   the required word reads unmistakably. */
+.wipeinput {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: #0a0c0a;
+  color: var(--tx);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 12px;
+  letter-spacing: 0.08em;
+}
+.wipeinput:focus-visible {
+  outline: 1px solid var(--bad);
   outline-offset: 1px;
 }
 .histrow .htitle {
