@@ -131,6 +131,19 @@ export default function SystemInfo() {
                 <Row label="Version" value={report.ollama.version ?? "—"} />
                 <Row label="Host" value={report.ollama.host} />
                 <Row
+                  label="Parallel chats"
+                  value={
+                    report.ollama.numParallelSource === "default"
+                      ? `${report.ollama.numParallel} (Ollama default)`
+                      : `${report.ollama.numParallel} (OLLAMA_NUM_PARALLEL)`
+                  }
+                />
+                <p className="sysnote">
+                  {report.ollama.numParallel === 1
+                    ? "One reply at a time per model: a chat started while another is streaming waits in Ollama's queue — the composer says \"Waiting for the model — another chat may be using it\". To stream two at once, set OLLAMA_NUM_PARALLEL=2 where ollama serve runs and restart it (RAM/VRAM scales with the count × context length)."
+                    : `Up to ${report.ollama.numParallel} replies stream at once per model; beyond that they queue (OLLAMA_MAX_QUEUE, default 512).`}
+                </p>
+                <Row
                   label="Installed models"
                   value={
                     report.ollama.models.length === 0

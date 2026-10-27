@@ -88,6 +88,9 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
   const messagesRef = useRef<Bubble[]>(messages);
   const [error, setError] = useState<ChatError | null>(null);
   const [warming, setWarming] = useState(false);
+  /** M8: no first token within 2.5 s → the request is probably queued
+   *  behind another chat (`OLLAMA_NUM_PARALLEL` default 1). */
+  const [queued, setQueued] = useState(false);
   const abortRef = useRef<AbortController | null>(null);
   /** Exactly what the last send transmitted — what Retry resends. */
   const payloadRef = useRef<Array<{ role: string; content: string }>>([]);
@@ -183,6 +186,13 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
     setError(null);
     const warm = selected !== null && !(status?.loaded ?? []).includes(selected);
     setWarming(warm);
+    setQueued(false);
+
+    // M8 queue state: silence for 2.5 s with no first token means the
+    // request is waiting for the model's slot — say so honestly instead of
+    // letting the composer sit dead with no explanation. Cleared by the
+    // first token, an error, a Stop, or the stream's end.
+    const queueTimer = window.setTimeout(() => setQueued(true), 2500);
 
     // Whether *this* run has appended reply text — Stop may only mark the
     // reply it actually cut short, never an earlier, completed one (row 28).
@@ -216,6 +226,8 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
       const content = parsed.message?.content;
       if (typeof content === "string" && content.length > 0) {
         producedText = true;
+        window.clearTimeout(queueTimer);
+        setQueued(false);
         setWarming(false);
         append(content);
       }
@@ -276,7 +288,9 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
         setError({ kind: "send", text: "The connection to Ollama was lost." });
       })
       .finally(() => {
+        window.clearTimeout(queueTimer);
         abortRef.current = null;
+        setQueued(false);
         setWarming(false);
         setStreaming(false);
         persist(); // §5.5(c) — done, Stop or error, the session is written
@@ -404,6 +418,12 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
         {warming && (
           <p className="warm" role="status">
             Warming up {selected} — the first reply takes a few seconds.
+          </p>
+        )}
+
+        {queued && (
+          <p className="warm" role="status">
+            Waiting for the model — another chat may be using it
           </p>
         )}
 

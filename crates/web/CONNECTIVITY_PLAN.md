@@ -574,6 +574,10 @@ visible, never in a tooltip.
   browser only.` above `[]`.
 - **Selection persistence:** `localStorage["las.selected.v1"]`, restored on
   mount, shared across tabs via the `storage` event (row 19).
+  **M8 retarget (normative):** the key lives in **`sessionStorage`** — the
+  cross-tab `storage` listener is deleted, so each tab keeps its own model
+  (row 53); `localStorage` survives only as a one-time legacy fallback read
+  on restore (row 54), and refusal paths clear both stores.
 - **Delete** `data/chat-sessions.ts` **at M4**; until then the seed stays and
   is explicitly a placeholder (§9 M1 note) — `Sidebar.tsx` (its only
   importer) switches to the store at M4. `filterSessions` moves wholesale —
@@ -693,7 +697,10 @@ own test uses `qwen2.5:7b`, `catalog.rs:417-430`); `llama3.2-vision:latest`
 ("Prefer smaller? llama3.2:3b (about 2 GB).") — one wording, §8 wins.
 
 **Persistence:** `localStorage` only — versioned keys (`las.sessions.v1`,
-`las.selected.v1`), no server DB.
+`las.selected.v1`), no server DB. *Retargeted since:* sessions moved to the
+server DB at **M7** (§5.5.1), and the selection key moved to
+`sessionStorage` at **M8** (§5.5) — `localStorage` now holds only the read
+cache and the legacy selection fallback.
 
 ---
 
@@ -720,7 +727,7 @@ own test uses `qwen2.5:7b`, `catalog.rs:417-430`); `llama3.2-vision:latest`
 | 16 | Chat while pulling | — | Allowed; background-download note | M3 |
 | 17 | Second pull attempted | provider `pulling` flag | Other Pull buttons disabled ("Pulling…") | M3 |
 | 18 | Selected model deleted externally | poll: name gone | Clear selection + "was removed — pick another model" | M1 |
-| 19 | Two tabs | `BroadcastChannel("las.history")` | Other tabs refetch; server row is the union (M7 retires the storage-event merge); selection sharing unchanged until M8 | M4 → M7 |
+| 19 | Two tabs | `BroadcastChannel("las.history")` | Other tabs refetch; server row is the union (M7 retires the storage-event merge); selection is **per-tab since M8** — no cross-tab `storage` listener exists, so a pick in one tab is neither adopted nor echoed | M4 → M8 |
 | 20 | History cache corrupt (localStorage) | JSON.parse throws | Cache resets to `[]`, server truth refetches → welcome state | M4 → M7 |
 | 21 | localStorage full (cache write) | QuotaExceededError | Cache deletes **itself**; sessions live in the DB, next load refetches (no eviction) | M4 → M7 |
 | 22 | Wrong OLLAMA_HOST | — | Folded into row 2 | — |
@@ -753,6 +760,10 @@ own test uses `qwen2.5:7b`, `catalog.rs:417-430`); `llama3.2-vision:latest`
 | 49 | History GET fails (server unreachable) | fetch rejects / 5xx | Cache stays on screen, no error notice — a failed *read* is offline tolerance, not data loss | M7 |
 | 50 | Delete-all attempted without the typed word | button `disabled` until value === "DELETE"; server requires `?all=1` | No wipe (client-side gate + server-side contract); lowercase word rejected | M7 |
 | 51 | History API called cross-origin or from a foreign Host | §3.3 guards, every handler | 403 before any body read or disk touch (same order as the Ollama routes) | M7 |
+| 52 | Chat sent while another chat streams the **same** model | no first token within 2.5 s (`queueTimer` in `run()`) | "Waiting for the model — another chat may be using it"; cleared by the first token, an error, Stop, or the stream's end — never left behind | M8 |
+| 53 | Two tabs, different models | each tab's own `sessionStorage["las.selected.v1"]` | Independent picks — tab A keeps its model when tab B switches; reload keeps each tab's own pick; no cross-tab adoption either way | M8 |
+| 54 | Pre-M8 profile upgrades (pick only in `localStorage`) | `sessionStorage` empty at restore | Legacy value adopted once into `sessionStorage`; refusal paths clear **both** stores | M8 |
+| 55 | `OLLAMA_NUM_PARALLEL` set to nonsense (`0`, `1.5`, `many`, >64) | `numParallelFromEnv()` strict `/^[1-9]\d{0,1}$/` ≤ 64 | Report `1 (Ollama default)` instead of inventing a number; the dialog's note always names its source | M8 |
 
 ---
 
@@ -778,6 +789,8 @@ quoted)
 | Pull confirm (>30B) | hardcoded `≈245 GB` | "This one is huge (≈{pullSize}) — bigger than anything the llama CLI recommends. Pull anyway / Cancel." (size interpolated; trigger `max(paramsBillions) > 30`) |
 | Pull cancel | "partial download resumes later" | "Download stopped. Ollama may pick it back up next time." |
 | Warm-up | "Warming up <model>…" | "Warming up llama3.1:8b — the first reply takes a few seconds." |
+| Queue wait (M8) | (none) | "Waiting for the model — another chat may be using it" — no punctuation, shown as a `.warm` status line above the composer; appears only after 2.5 s of first-token silence |
+| System info — parallel | (none) | Row "Parallel chats" → `1 (Ollama default)` or `N (OLLAMA_NUM_PARALLEL)` (always names the source), plus a `.sysnote` naming the queue, the composer line above, and the `OLLAMA_NUM_PARALLEL` knob where `ollama serve` runs |
 | History meta (normal) | "N of M sessions" | "**N sessions** — saved on this machine" (M7; was "stored in this browser") |
 | History meta (query active) | "N of M … matching" + "— raw JSON" | "**N of M** sessions matching \"q\"" |
 | History empty | bare `[]` / raw JSON | "No chats yet — messages you send are saved on this machine." (no JSON rendered at all since M7); "No sessions match \"q\"." on zero results; skeleton until hydrated |
@@ -873,6 +886,16 @@ Voice check at M4: the section must read like `llama`'s guided recommender
   enables on an exact `DELETE`. Deleting a row shows an inline
   **Delete / Keep** pair — no dialog for one chat, a typed confirm for
   all of them.
+- **M8:** the composer's queue line is exactly "Waiting for the model —
+  another chat may be using it" (no trailing period), and it exists only
+  while a first token is pending — it clears itself on the first token,
+  an error, Stop, or the stream's end. It never claims the chat is broken
+  or the model is down: Ollama is simply busy with the same model. The
+  System info card states the limit as a *fact with its source* ("1
+  (Ollama default)" vs "2 (OLLAMA_NUM_PARALLEL)") and the note tells the
+  reader the one knob that changes it, where it must be set, and that
+  memory scales with the count — no promise of speedups this machine
+  can't deliver.
 
 ---
 
@@ -968,7 +991,11 @@ Voice check at M4: the section must read like `llama`'s guided recommender
   state when the first token is slow (same-model requests queue at
   `OLLAMA_NUM_PARALLEL=1`; noted in System info). *Done when:* two tabs
   select independently and both streams produce first tokens while the other
-  is still running.
+  is still running. *Measured on the reference box (i5-1035G1, CPU-only):*
+  two tabs on different models each reached first token within ~0.5 s of
+  each other while the other was mid-stream; same-model contention put the
+  wait line on screen at **2.5 s** and the queued chat's first token at
+  **~168 s** — the wait line cleared the moment tokens arrived.
 - **M9 — Desktop-responsive pass + baselines.** Fluid shell
   (`min(1680px, 100%)` replacing the 1000 px cap), `clamp()` column tracks,
   independently scrolling panels, modal sizing, ladder ≥1600 / 1280–1599 /

@@ -43,6 +43,14 @@ export interface SystemReport {
     host: string;
     /** Parsed from `ollama --version`, null when not installed. */
     version: string | null;
+    /**
+     * `OLLAMA_NUM_PARALLEL` this server would run with — the max parallel
+     * requests *per model* (Ollama's default is 1: same-model chats
+     * process one at a time, the rest queue behind `OLLAMA_MAX_QUEUE`).
+     */
+    numParallel: number;
+    /** Whether that value came from the environment or is the default. */
+    numParallelSource: "env" | "default";
     /** Where its models live, for the re-install reassurance copy. */
     modelDir: string | null;
     models: SystemModel[];
@@ -81,6 +89,23 @@ export function parseOllamaVersion(raw: string | null | undefined): string | nul
   if (!raw) return null;
   const match = /v?(\d+\.\d+\.\d+(?:[-+][0-9A-Za-z.-]+)?)/.exec(raw);
   return match ? match[1] : null;
+}
+
+/**
+ * `OLLAMA_NUM_PARALLEL` as this process sees it (M8): the max parallel
+ * requests *per model* — Ollama's documented default is 1, i.e. chats with
+ * the same model run one at a time and the rest queue (up to
+ * `OLLAMA_MAX_QUEUE`, then 503). A missing/garbage value reports the
+ * default rather than inventing a number; the dialog says which it got.
+ */
+export function numParallelFromEnv(): { value: number; source: "env" | "default" } {
+  const raw = process.env.OLLAMA_NUM_PARALLEL?.trim() ?? "";
+  // Strict: an all-digit count in 1..64 — "1.5", "0", "-3" or "many" are
+  // all nonsense, and inventing a plausible number would be dishonest.
+  if (!/^[1-9]\d{0,1}$/.test(raw)) return { value: 1, source: "default" };
+  const parsed = Number.parseInt(raw, 10);
+  if (parsed > 64) return { value: 1, source: "default" };
+  return { value: parsed, source: "env" };
 }
 
 /** Round a load average to the two decimals terminals show (pure). */
@@ -138,6 +163,7 @@ function toModel(entry: UpstreamModel, residentBytes: number | null): SystemMode
 /** Fresh report for `GET /api/system`. Never throws. */
 export async function collectSystem(): Promise<SystemReport> {
   const probe = await probeInstalled();
+  const parallel = numParallelFromEnv();
   const cpus = os.cpus();
   const [distro, appDisk, homeDisk] = await Promise.all([
     readDistro(),
@@ -165,6 +191,8 @@ export async function collectSystem(): Promise<SystemReport> {
       running: false,
       host: base(),
       version: probe.installed ? parseOllamaVersion(await ollamaVersion()) : null,
+      numParallel: parallel.value,
+      numParallelSource: parallel.source,
       modelDir: null,
       models: [],
       modelsBytes: 0,

@@ -820,6 +820,14 @@ a.nav .item,
   color: var(--tx);
   font-size: 10.5px;
 }
+/* Explanatory note under a row (M8's parallel-chats note) — the value
+   above stays a value; the "why" lives here at note size. */
+.sysnote {
+  margin: 6px 0 0;
+  color: var(--dim);
+  font-size: 9.5px;
+  line-height: 1.55;
+}
 .syserror {
   margin: 0;
   color: var(--bad);

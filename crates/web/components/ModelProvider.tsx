@@ -219,7 +219,9 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   /**
    * Selection core: mirror the ref, commit, clear the row-18 notice and
    * the M6 refusal, un-block auto-picking, and persist to
-   * `las.selected.v1` (shared across tabs via `storage`).
+   * `las.selected.v1` in **sessionStorage** (M8: per-tab — two tabs may
+   * hold different models; `localStorage` is only read as the legacy
+   * fallback during restore).
    */
   const applySelection = useCallback((name: string) => {
     selectedRef.current = name;
@@ -228,7 +230,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
     setNonLlama(null);
     blockedRef.current = false;
     try {
-      window.localStorage.setItem(SELECTED_KEY, name);
+      window.sessionStorage.setItem(SELECTED_KEY, name);
     } catch {
       // Selection persistence is best-effort; the session keeps working.
     }
@@ -313,7 +315,8 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
     if (!status.running) return; // unreachable — don't guess (rows 5/6)
 
     // M6: installed, but not a chat model for this app — refuse it, say so
-    // by name, forget the persisted pick, and stay unselected until the
+    // by name, forget the persisted pick (both the tab's sessionStorage and
+    // any legacy localStorage copy), and stay unselected until the
     // user chooses a chat model themselves.
     if (current !== null && status.models.some((m) => m.name === current)) {
       selectedRef.current = null;
@@ -322,6 +325,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
       setNonLlama(current);
       blockedRef.current = true;
       try {
+        window.sessionStorage.removeItem(SELECTED_KEY);
         window.localStorage.removeItem(SELECTED_KEY);
       } catch {
         // Storage is best-effort; the in-memory refusal is what matters.
@@ -336,9 +340,19 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
     // the next auto-pick (M6): the user decides what replaces it.
     if (blockedRef.current) return;
 
+    // M8: this tab's own pick survives reload but is never broadcast — two
+    // tabs may hold different models. A pre-M8 profile's localStorage value
+    // is adopted once as the legacy fallback (so an existing user's pick
+    // isn't silently lost by the upgrade).
     let stored: string | null = null;
     try {
-      stored = window.localStorage.getItem(SELECTED_KEY);
+      stored = window.sessionStorage.getItem(SELECTED_KEY);
+      if (stored === null) {
+        stored = window.localStorage.getItem(SELECTED_KEY);
+        if (stored !== null) {
+          window.sessionStorage.setItem(SELECTED_KEY, stored);
+        }
+      }
     } catch {
       stored = null; // storage unavailable (private mode) — fall back silently
     }
@@ -354,6 +368,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
       setNonLlama(stored);
       blockedRef.current = true;
       try {
+        window.sessionStorage.removeItem(SELECTED_KEY);
         window.localStorage.removeItem(SELECTED_KEY);
       } catch {
         // best-effort; the in-memory refusal is what the user sees
@@ -367,29 +382,16 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
     setSelected(next);
     if (next !== null) {
       try {
-        window.localStorage.setItem(SELECTED_KEY, next);
+        window.sessionStorage.setItem(SELECTED_KEY, next);
       } catch {
         // Selection persistence is best-effort; the session keeps working.
       }
     }
   }, [status]);
 
-  // Row 19: a model picked in another tab is adopted here — state only, so
-  // the event never echoes back as a write. Unknown picks are ignored (the
-  // picker only offers what this machine has).
-  useEffect(() => {
-    const onStorage = (event: StorageEvent) => {
-      if (event.key !== SELECTED_KEY) return;
-      const picked = event.newValue;
-      if (picked === null) return;
-      if (!status?.models.some((model) => model.name === picked)) return;
-      selectedRef.current = picked;
-      setSelected(picked);
-      setRemoved(null);
-    };
-    window.addEventListener("storage", onStorage);
-    return () => window.removeEventListener("storage", onStorage);
-  }, [status]);
+  // M8 removed the row-19 cross-tab `storage` listener here: selection is
+  // per-tab now (sessionStorage), so a pick in another tab must neither be
+  // adopted nor echoed back. Tabs still share *history* via BroadcastChannel.
 
   const select = useCallback(
     (name: string, opts?: { restart?: boolean }) => {

@@ -1,5 +1,10 @@
-import { describe, expect, it } from "vitest";
-import { parseOllamaVersion, parseOsRelease, roundLoad } from "@/lib/system";
+import { describe, expect, it, vi } from "vitest";
+import {
+  numParallelFromEnv,
+  parseOllamaVersion,
+  parseOsRelease,
+  roundLoad,
+} from "@/lib/system";
 
 describe("parseOsRelease", () => {
   it("reads PRETTY_NAME out of a real os-release file", () => {
@@ -55,5 +60,33 @@ describe("roundLoad", () => {
     expect(roundLoad([0, 0, 0])).toEqual([0, 0, 0]);
     expect(roundLoad([Number.NaN])).toEqual([0, 0, 0]);
     expect(roundLoad([])).toEqual([0, 0, 0]);
+  });
+});
+
+describe("numParallelFromEnv (M8)", () => {
+  it("reports Ollama's default of 1 when unset or blank", () => {
+    vi.stubEnv("OLLAMA_NUM_PARALLEL", "");
+    expect(numParallelFromEnv()).toEqual({ value: 1, source: "default" });
+    vi.stubEnv("OLLAMA_NUM_PARALLEL", "   ");
+    expect(numParallelFromEnv()).toEqual({ value: 1, source: "default" });
+  });
+
+  it("accepts a sane configured value", () => {
+    vi.stubEnv("OLLAMA_NUM_PARALLEL", "2");
+    expect(numParallelFromEnv()).toEqual({ value: 2, source: "env" });
+    vi.stubEnv("OLLAMA_NUM_PARALLEL", "8");
+    expect(numParallelFromEnv()).toEqual({ value: 8, source: "env" });
+  });
+
+  it("refuses garbage instead of inventing a number", () => {
+    for (const bad of ["0", "-3", "72", "many", "1.5"]) {
+      vi.stubEnv("OLLAMA_NUM_PARALLEL", bad);
+      expect(numParallelFromEnv()).toEqual({ value: 1, source: "default" });
+    }
+  });
+
+  it("restores the environment afterwards", () => {
+    vi.unstubAllEnvs();
+    expect(typeof numParallelFromEnv().value).toBe("number");
   });
 });
