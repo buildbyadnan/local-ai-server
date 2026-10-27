@@ -489,6 +489,7 @@ a:focus-visible {
 }
 .oact {
   display: flex;
+  flex-wrap: wrap;
   gap: 6px;
 }
 .btn {
@@ -511,6 +512,252 @@ a:focus-visible {
   color: var(--y);
   font-size: 9.5px;
   line-height: 1.5;
+}
+
+/* ------------- M5: dialog shell (shared by every modal) ------------- */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgba(0, 0, 0, 0.62);
+}
+.modal {
+  display: flex;
+  flex-direction: column;
+  width: min(560px, 100%);
+  max-height: 85vh;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: #0d100d;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, 0.55);
+}
+.modal:focus {
+  outline: none;
+}
+.modal-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px 10px;
+  border-bottom: 1px solid var(--line);
+}
+.modal-head h3 {
+  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tx);
+}
+.modal-x {
+  padding: 4px 8px;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  background: none;
+  color: var(--mut);
+  font-size: 13px;
+  cursor: pointer;
+}
+.modal-x:hover {
+  border-color: var(--line);
+  color: var(--tx);
+}
+.modal-x:focus-visible {
+  outline: 1px solid var(--g);
+  outline-offset: 2px;
+}
+.modal-body {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 14px 16px 16px;
+  overflow-y: auto;
+  font-size: 11.5px;
+  line-height: 1.6;
+  color: var(--mut);
+}
+.omodal-p {
+  margin: 0;
+}
+.oinline {
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: #0a0c0a;
+  color: #9fd8a8;
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 10.5px;
+}
+
+/* ------------- M5: command blocks with a copy button ------------- */
+.ocmds {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ocmdblock {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.ocmdlabel {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.cmdrow {
+  display: flex;
+  align-items: stretch;
+  gap: 6px;
+}
+.cmdrow .ocmd {
+  flex: 1;
+  min-width: 0;
+}
+.copybtn {
+  flex: none;
+  align-self: flex-start;
+}
+.btn.danger:hover {
+  border-color: var(--bad);
+  color: var(--bad);
+}
+.btn:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* ------------- M5: honest start/check notes ------------- */
+.ostart {
+  margin: 0;
+  font-size: 10.5px;
+  line-height: 1.5;
+}
+.ostart.ok {
+  color: var(--g);
+}
+.ostart.bad {
+  color: var(--y);
+}
+
+/* ------------- M5: the models dialog ------------- */
+.mrows {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.mrow {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 10px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #101310;
+}
+.mmain {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 140px;
+}
+.mname {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  color: var(--tx);
+  font-family: var(--font-geist-mono), ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 11.5px;
+}
+.mloaded {
+  padding: 1px 6px;
+  border: 1px solid #1e5a2a;
+  border-radius: 999px;
+  background: #0f2a14;
+  color: var(--g);
+  font-family: var(--font-geist-sans), system-ui, sans-serif;
+  font-size: 9px;
+}
+.mmeta {
+  color: var(--dim);
+  font-size: 10px;
+}
+.macts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mconfirm {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.mwarn {
+  flex-basis: 100%;
+  margin: 0;
+  color: var(--y);
+  font-size: 10px;
+  line-height: 1.5;
+}
+
+/* ------------- M5: the system-info dialog ------------- */
+.sysgrid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 10px;
+}
+.syscard {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 11px;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  background: #101310;
+}
+.syscard h4 {
+  margin: 0;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--dim);
+}
+.sysrow {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.syslabel {
+  flex: none;
+  color: var(--dim);
+  font-size: 10px;
+}
+.sysvalue {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  text-align: right;
+  color: var(--tx);
+  font-size: 10.5px;
+}
+.syserror {
+  margin: 0;
+  color: var(--bad);
+  font-size: 11px;
+}
+.sysact {
+  justify-content: flex-end;
 }
 
 /* ---------------- center: chat ---------------- */
@@ -1630,4 +1877,31 @@ button.tname:focus-visible,
   font-size: 9.5px;
   color: var(--g);
   letter-spacing: 0.04em;
+}
+
+/* ---------------- M5: dialogs stay usable in narrow windows ----------------
+   This is a desktop app, but a docked sidebar window can be as small as a
+   phone — commands stack vertically and the card grid collapses to one
+   column instead of squeezing values into unreadable slivers. */
+@media (max-width: 620px) {
+  .modal-backdrop {
+    padding: 10px;
+  }
+  .modal {
+    max-height: 92vh;
+  }
+  .cmdrow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .sysgrid {
+    grid-template-columns: 1fr;
+  }
+  .mrow {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  .macts {
+    justify-content: flex-start;
+  }
 }

@@ -4,6 +4,7 @@ import { useState } from "react";
 import { filterSessions, formatRelative } from "@/lib/history";
 import { useOllama } from "@/components/ModelProvider";
 import OllamaStatus from "@/components/OllamaStatus";
+import SystemInfo from "@/components/SystemInfo";
 
 const NAV_ITEMS = [
   {
@@ -120,6 +121,10 @@ export default function Sidebar() {
           </span>
         ))}
       </nav>
+
+      {/* System info sits directly above OLLAMA (§9 M5) — same row shape,
+          a dialog instead of an inline expansion. */}
+      <SystemInfo />
 
       <OllamaStatus />
 

@@ -211,12 +211,17 @@ function candidates(): Candidate[] {
 
 /** Does this binary exist and run? Never rejects — the callback always fires. */
 function runs(file: string): Promise<boolean> {
+  return outputOf(file).then((out) => out !== null);
+}
+
+/** `--version` output of a candidate binary, or null when it doesn't run. */
+function outputOf(file: string): Promise<string | null> {
   return new Promise((resolve) => {
     execFile(
       file,
       ["--version"],
       { timeout: 2000, env: process.env },
-      (error) => resolve(error === null),
+      (error, stdout, stderr) => resolve(error === null ? `${stdout}${stderr}` : null),
     );
   });
 }
@@ -232,6 +237,24 @@ export async function probeInstalled(): Promise<{
     }
   }
   return { installed: false, onPath: false };
+}
+
+/** Absolute path of the first binary that actually runs, else null. */
+export async function findOllama(): Promise<string | null> {
+  for (const candidate of candidates()) {
+    if (await outputOf(candidate.file)) return candidate.file;
+  }
+  return null;
+}
+
+/**
+ * Raw `ollama --version` output ("ollama version is 0.40.8"), or null when
+ * Ollama isn't installed. Parsing into a version lives in `lib/system.ts`
+ * so this stays a dumb, honest passthrough of the binary's own words.
+ */
+export async function ollamaVersion(): Promise<string | null> {
+  const bin = await findOllama();
+  return bin === null ? null : outputOf(bin);
 }
 
 /**

@@ -702,6 +702,14 @@ own test uses `qwen2.5:7b`, `catalog.rs:417-430`); `llama3.2-vision:latest`
 | 36 | Restore with uninstalled model | `session.model ∉ models` | Read-only messages + row-18 notice, input disabled until a model is picked | M4 |
 | 37 | Hydration | `hydrated === false` | Skeleton in `<pre>` **and meta** — no "No chats yet"/"0 sessions" flash | M4 |
 | 38 | Stream active + session row / `＋ New chat` clicked | stream state | `aria-disabled` + "Stop the reply first" | M2 |
+| 39 | System info unreadable | `/api/system` 5xx/network | "Couldn't read this machine's details — try again." + Refresh (dialog stays open) | M5 |
+| 40 | Update check can't reach GitHub | fetch fails / 403 / 429 | Honest reason in the dialog; a version is only ever shown when one was actually read | M5 |
+| 41 | `ollama rm` while `OLLAMA_HOST` is not the stock local server | server-side `isStockLocalHost(base())` gate | 409 + inline error; the Delete button isn't rendered either (it would delete on the *wrong* server) | M5 |
+| 42 | `ollama rm` with a malformed tag | tag regex | 400 before any binary lookup; the UI only ever sends a tag it is displaying | M5 |
+| 43 | Start fails to spawn, or 10 × 700 ms poll never sees `running` | spawn error / status never flips | Inline "Ollama didn't come up — run `ollama serve` in a terminal to see why." | M5 |
+| 44 | Start would be pointless (non-stock `OLLAMA_HOST`) | `isStockLocalHost(status.host)` false | No Start button — spawning a stock server could never flip this status | M5 |
+| 45 | Show models while Ollama is down | `status.running === false` | "Ollama isn't running at {host}…" — no fabricated list | M5 |
+| 46 | Clipboard write refused | permission / insecure context | Button says "Couldn't copy" and the command stays selectable — never a false "Copied ✓" | M5 |
 
 ---
 
@@ -786,6 +794,20 @@ Voice check at M4: the section must read like `llama`'s guided recommender
   instead of clearing state — the keyed remount *is* the reset, so a blank
   conversation can never be written back into the session it was opened
   from, and no effect has to clear anything.
+
+- **M5:** every dialog reports only what it actually did or read. Install,
+  Update and Re-install print **copyable** commands with the standing line
+  "this app never runs installers for you"; the update dialog shows the
+  installed version from `ollama --version` and, only after an explicit
+  check, whatever GitHub answered — including "Couldn't reach github.com"
+  instead of a guessed version. Delete's confirm names the exact tag and
+  says the files leave the disk ("Your chats stay; the model has to be
+  downloaded again"). Start says "Ollama is running" only after the status
+  poll sees it, else it hands the user the terminal command.
+- **M5:** the system dialog prints measured values ("11.3 GB (34%)",
+  "143.4 GB free of 247.7 GB", "3m 17s") and renders `—` for anything it
+  couldn't read — no rounded-up comfort numbers, no invented Next/Node
+  versions.
 
 ---
 
