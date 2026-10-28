@@ -236,7 +236,7 @@ never drift.
 
 ```bash
 # --- Cargo ---
-cargo build --release          # binary at target/release/llama-cli
+cargo build --release          # binary at target/release/llama-cli (.exe on Windows)
 cargo test --release           # 23 unit tests, fully offline
 
 # --- Bazel (pinned toolchain, fully hermetic) ---
@@ -247,6 +247,40 @@ bazel test //crates/llama-cli:llama-cli_test
 > After changing dependencies in `crates/llama-cli/Cargo.toml`, run
 > `cargo build` and then `CARGO_BAZEL_REPIN=1 bazel build //...` to re-pin Bazel.
 
+### Web UI (`crates/web`)
+
+A local-only Next.js chat interface for the same Ollama backend — a side crate
+that never ships. It builds with **pnpm**, not Bazel (`.bazelignore` keeps it
+out of `//...`), and CI lints, tests and builds it alongside the Cargo matrix.
+
+**Want to run it? You need two free installs and four commands — no AI
+knowledge required, and nothing you type leaves your machine.**
+
+1. **[Node.js 22.23.4+](https://nodejs.org)** — install the *LTS* version (24
+   LTS is fine; don't use anything older than 22.23.4 — it has a known security
+   hole), then run `corepack enable` once in a terminal so the `pnpm` command
+   works.
+2. **[Ollama](https://ollama.com/download)** — the free local AI server.
+   Install it and start it (open the app; on Linux run `ollama serve`).
+
+Then:
+
+```bash
+git clone https://github.com/buildbyadnan/local-ai-server.git
+cd local-ai-server/crates/web
+pnpm install            # downloads the app's packages (first time only)
+ollama pull llama3.2    # downloads a small ~2 GB model (first time only)
+pnpm dev                # opens the app at http://127.0.0.1:3000
+```
+
+Open **<http://127.0.0.1:3000>**: the sidebar should read `● Connected`,
+click `llama3.2:latest` in the right-hand panel, and type a message — replies
+stream live from your machine and chats are saved in a local database on
+this machine, shared by every browser and profile, with new messages
+appearing everywhere in realtime (no refresh).
+Stuck? The full walkthrough plus a "something not working?" table is in
+[`crates/web/README.md`](crates/web/README.md).
+
 ### Project layout
 
 ```
@@ -255,19 +289,27 @@ llama/
 ├── MODULE.bazel                 # bzlmod: rules_rust + pinned Rust toolchain
 ├── .bazelversion / .bazelrc     # pins Bazel 9.3.1
 ├── install.sh / install.ps1     # prebuilt-binary installers (mac/linux, windows)
+├── models/                      # the researched model docs (19 files, one per family)
+├── docs/                        # design audits (e.g. the colibri deep-dive)
 ├── .github/workflows/
-│   ├── ci.yml                   # tests on Linux/macOS/Windows
+│   ├── ci.yml                   # tests on Linux/macOS/Windows + web lint/test/build
 │   └── release.yml              # builds release binaries on a v* tag
-└── crates/llama-cli/
-    ├── Cargo.toml / BUILD.bazel
-    └── src/
-        ├── main.rs              # subcommand dispatch + guided recommender
-        ├── cli.rs               # clap definitions
-        ├── catalog.rs           # the ≤30B model catalog, guide, and recommender
-        └── ollama/
-            ├── types.rs         # serde structs for Ollama's /api/* JSON
-            ├── client.rs        # HTTP client (ping/list/generate/chat)
-            └── stream.rs        # NDJSON → async stream of chunks
+└── crates/
+    ├── llama-cli/
+    │   ├── Cargo.toml / BUILD.bazel
+    │   └── src/
+    │       ├── main.rs          # subcommand dispatch + guided recommender
+    │       ├── cli.rs           # clap definitions
+    │       ├── catalog.rs       # the ≤30B model catalog, guide, and recommender
+    │       └── ollama/
+    │           ├── types.rs     # serde structs for Ollama's /api/* JSON
+    │           ├── client.rs    # HTTP client (ping/list/generate/chat)
+    │           └── stream.rs    # NDJSON → async stream of chunks
+    └── web/                     # Next.js UI (pnpm; ignored by Bazel)
+        ├── app/                 # routes + globals.css
+        ├── components/          # Sidebar / CenterChat / AiModule
+        ├── data/                # the 19-model guide registry (chat history lives in lib/history-db.ts)
+        └── proxy.ts             # real-404 gate for unknown model slugs
 ```
 
 ### Publishing a release (maintainers)
@@ -278,8 +320,8 @@ binaries the installers download:
 ```bash
 git push origin main   # push your commits first
 
-git tag v0.1.0         # name the release (any v<number> works)
-git push origin v0.1.0 # triggers release.yml: builds 5 binaries (~5 min)
+git tag v0.2.0         # name the release (any new v<number> works)
+git push origin v0.2.0 # triggers release.yml: builds 5 binaries (~5 min)
 ```
 
 When the **Actions** → *release* workflow is green, the release (with all
@@ -295,7 +337,7 @@ starts working.
   `"rustls-tls"` to the `reqwest` features in `Cargo.toml` (pulls in a C dep).
 - **Hermetic Bazel builds.** The Rust toolchain (`1.98.0`) and every crate are
   pinned; Bazel downloads its own compiler instead of using yours.
-- **Releases.** Pushing a tag like `v0.1.0` triggers `release.yml`, which builds
+- **Releases.** Pushing a tag like `v0.2.0` triggers `release.yml`, which builds
   macOS (arm64 + Intel), Linux (x64 + arm64), and Windows x64 binaries and
   attaches them to a GitHub Release — which is what the installers download.
 

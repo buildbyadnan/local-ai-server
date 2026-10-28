@@ -1,0 +1,10 @@
+# pnpm 12 keeps project settings here (it no longer reads .npmrc).
+
+# Security floor: anything below Node 22.23.4 is exposed to the bundled
+# Brotli RCE (CVE-2026-111497, "Node2Shell"), so refuse to install or run
+# against it instead of failing silently later.
+engineStrict: true
+
+allowBuilds:
+  sharp: false
+  unrs-resolver: false
