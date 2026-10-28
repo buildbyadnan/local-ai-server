@@ -32,6 +32,13 @@ with the system's headless Chrome driven over the DevTools protocol:
 - fresh, empty profile, so `home` shows the first-visit state
   (`0 sessions` + the welcome comment).
 
+> **OS note:** the capture scripts were written and run on **Linux**, against
+> the system Chrome at `/usr/bin/google-chrome`. On macOS point them at
+> `/Applications/Google Chrome.app/Contents/MacOS/Google Chrome`; on Windows
+> at `chrome.exe` under `Program Files`. The committed PNGs are
+> browser-independent — any Chromium build renders these pages identically —
+> so a diff taken on another OS is still meaningful.
+
 State the shots depend on (so a diff on another machine isn't a false
 alarm): the real local Ollama with **its** installed models, so the
 installed-model chips, the picker label and the tree's ✓/Pull badges show
@@ -75,5 +82,5 @@ whatever that machine has.
 | M4 history matrix (CDP, 33 checks: rows, copy, space pass, a11y) | 33/33 pass |
 | M3 pull matrix (CDP, 35 checks, against the stand-in fleet) | 35/35 pass |
 | UI audit matrix (CDP, 144 checks) | 144/144 pass |
-| internal link crawl | 23 pages, all 200; bogus slug 404; foreign `Host` → 403; cross `Origin` → 403; `Content-Encoding` → 415 |
+| internal link crawl | 25 internal URLs (pages + static chunks + the 2 vendored font preloads), all 200; bogus slug 404; foreign `Host` → 403; cross `Origin` → 403; `Content-Encoding` → 415 |
 | `bazel build //...` | green (`.bazelignore` keeps this crate out) |

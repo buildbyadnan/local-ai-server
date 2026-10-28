@@ -70,14 +70,17 @@ pnpm install     # once
 pnpm dev         # http://127.0.0.1:3000
 pnpm lint        # eslint (core-web-vitals + TS)
 pnpm test        # vitest unit suite
-pnpm build       # production build (33 routes)
+pnpm build       # production build (34 routes)
 pnpm start       # serve the production build (bound to 127.0.0.1)
 ```
 
 Requires Node **22.23.4 or newer** (Node 24 LTS also works; anything older
 is affected by the October 2026 Brotli RCE, CVE-2026-111497, so `package.json`
 declares `engines.node: ">=22.23.4"`) and pnpm 12 (pinned via `packageManager`).
-Check yours with `node -v`; to upgrade without touching the system install:
+Check yours with `node -v`. To upgrade, the simplest way on **any** OS is the
+installer from <https://nodejs.org/en/download> (macOS: `.pkg`; Windows:
+`.msi`, tick "Add to PATH"). On Linux, or to upgrade without touching the
+system install, unpack the tarball instead:
 
 ```bash
 curl -fsSL https://nodejs.org/dist/v22.23.4/node-v22.23.4-linux-x64.tar.xz | tar -xJ -C "$HOME/.local"
@@ -87,18 +90,23 @@ node -v   # v22.23.4
 
 ## What's in the box
 
-| Route            | Contents                                                              |
-| ---------------- | --------------------------------------------------------------------- |
-| `/`              | Three-panel chat shell: sidebar, empty chat, AI Module model tree      |
-| `/llama`         | Directory of all 19 Llama models in three size tiers                   |
-| `/llama/[slug]`  | Plain-English guide per model (what it is, flaws, who should use it)    |
-| `/api/ollama/*`  | Same-origin proxy to the local Ollama server: status, chat, pull       |
-| anything else    | Styled 404 (`proxy.ts` gates unknown slugs to a real HTTP 404)         |
+| Route                  | Contents                                                              |
+| ---------------------- | --------------------------------------------------------------------- |
+| `/`                    | Three-panel chat shell: sidebar, empty chat, AI Module model tree      |
+| `/llama`               | Directory of all 19 Llama models in three size tiers                   |
+| `/llama/[slug]`        | Plain-English guide per model (what it is, flaws, who should use it)    |
+| `/api/ollama/*`        | Same-origin proxy to the local Ollama server: status, chat, pull, rm, start, update |
+| `/api/history`         | Chat sessions in a local SQLite file: list, save, delete (GET/POST/DELETE) |
+| `/api/history/stream`  | Server-sent events: a new history entry fans out to every open tab/profile |
+| `/api/system`          | OS / CPU / RAM / disk snapshot for the System-info dialog              |
+| anything else          | Styled 404 (`proxy.ts` gates unknown slugs to a real HTTP 404)         |
 
 ```
 app/                  Routes + the single stylesheet (globals.css)
   llama/[slug]/       The 19 model guides (static params, plain language)
-  api/ollama/         Status / streaming chat / pull — proxying OLLAMA_HOST
+  api/ollama/         Status / streaming chat / pull / rm / start / update — proxying OLLAMA_HOST
+  api/history/        SQLite session store (list / save / delete) + the SSE stream
+  api/system/         OS / CPU / RAM / disk snapshot for the System-info dialog
 components/           ModelProvider, Sidebar (nav + session history), CenterChat,
                       AiModule (model tree + picker), Pull, OllamaStatus, Footer,
                       ChatText (the reply markdown renderer)
@@ -107,6 +115,7 @@ data/models/          Single source of truth for every model: tree, directory,
 lib/                  Pure helpers + their unit tests: ndjson, match, history
                       (SQLite session store), markdown (reply renderer),
                       ollama (tag validation, status fetch)
+public/fonts/         Vendored Geist + Geist Mono (11 woff2 subsets, no CDN)
 proxy.ts              Rewrites unknown /llama/<slug> to the static 404
 ```
 
