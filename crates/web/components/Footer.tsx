@@ -5,7 +5,7 @@
  * pins it to the bottom of the viewport when the content is short.
  *
  * The links leave for the system browser; the app itself never loads
- * anything remote (§9 M13's offline audit asserts it).
+ * anything remote (the offline audit asserts it).
  */
 export default function Footer() {
   return (

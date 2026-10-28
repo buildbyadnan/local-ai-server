@@ -31,8 +31,7 @@ export function feedChunk(buffer: string, chunk: string): FedChunk {
 
 /**
  * Parse one NDJSON line. Returns `null` for blank lines and malformed JSON
- * (a damaged line must never break the stream — row 29 of the state
- * matrix), otherwise the decoded value.
+ * (a damaged line must never break the stream), otherwise the decoded value.
  */
 export function parseJsonLine<T>(line: string): T | null {
   const trimmed = line.trim();

@@ -48,7 +48,7 @@ export default function AiModule() {
         .sort((a, b) => a.name.localeCompare(b.name))
     : [];
   const loaded = status?.loaded ?? [];
-  // Guides this machine satisfies (§6 rules 1–3): chips, select-on-click
+  // Guides this machine satisfies (the guide-matching rules): chips, select-on-click
   // rows, and which guides offer a Pull button all key off it.
   const matches = useMemo(
     () => matchInstalled(status?.models ?? [], allModels),
@@ -56,8 +56,8 @@ export default function AiModule() {
   );
 
   /** Pick from the menu: silent when the chat is empty, confirmed otherwise.
-   *  Both paths restart — §5.5's model-change reset — and the messages are
-   *  already written by the save points, so nothing is lost (§5.2).
+   *  Both paths restart — the model-change reset — and the messages are
+   *  already written by the save points, so nothing is lost.
    *
    *  Row 36 exception: while the open session's model is gone, re-picking
    *  the *already selected* model must not be a no-op — it is the "choose a

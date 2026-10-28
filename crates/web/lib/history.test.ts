@@ -62,7 +62,7 @@ describe("filterSessions", () => {
   });
 });
 
-describe("capSessions (§5.5 prune)", () => {
+describe("capSessions (session prune)", () => {
   it("evicts the oldest session past 20", () => {
     const list = Array.from({ length: 21 }, (_, i) =>
       session(`s${String(i).padStart(2, "0")}`, `2026-10-26T10:${String(i).padStart(2, "0")}:00Z`),
@@ -82,7 +82,7 @@ describe("capSessions (§5.5 prune)", () => {
   });
 });
 
-describe("mergeSessions (row 19 union)", () => {
+describe("mergeSessions (union)", () => {
   const a = [session("shared", "2026-10-26T10:00:00Z", 2), session("only-a", "2026-10-26T09:00:00Z")];
 
   it("unions by id and sorts newest first", () => {

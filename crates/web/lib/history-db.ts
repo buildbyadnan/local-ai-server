@@ -3,10 +3,10 @@
  * `node:sqlite` — zero new dependencies, a single self-contained file that
  * every Chrome profile on this machine talks to through the API.
  *
- * Why SQLite over the previous `localStorage` blob (decisions §2.5):
+ * Why SQLite over the previous `localStorage` blob:
  * - **cross-profile**: all browsers on this box share one file instead of
  *   each profile holding its own isolated `localStorage`;
- * - **no quota cliff**: row 21's eviction dance exists only because
+ * - **no quota cliff**: the old eviction dance existed only because
  *   localStorage is a 5 MB shared quota — the DB doesn't have one;
  * - **single source of truth**: the server validates and stamps every
  *   write, so tabs/profiles can't disagree about `updated_at`.
@@ -172,7 +172,7 @@ export function listSessions(): ChatSession[] {
   return rows.map(rowToSession).filter((s): s is ChatSession => s !== null);
 }
 
-/** §5.5 caps in the DB: keep the newest MAX_SESSIONS by (updated_at). */
+/** Session caps in the DB: keep the newest MAX_SESSIONS by (updated_at). */
 function enforceSessionCap(): void {
   conn()
     .prepare(
@@ -186,7 +186,7 @@ function enforceSessionCap(): void {
 }
 
 /**
- * One §5.5 write (create on first send, update after). The server owns
+ * One history write (create on first send, update after). The server owns
  * `updated_at`; `title` and `created_at` are computed once and then frozen
  * — re-posts of the same id can never rename or backdate a conversation.
  */

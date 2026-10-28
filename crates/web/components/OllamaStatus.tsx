@@ -13,7 +13,7 @@
  * and four dialogs sharing the focus-trapped `Modal`: install commands,
  * every installed model (copy tag / confirmed delete), the update check,
  * and re-install. Nothing here ever executes an installer — commands are
- * shown for the user to run (decisions §2.4), and the only command the
+ * shown for the user to run — nothing is executed for them — and the only command the
  * server will run for us is the allowlisted `ollama rm <tag>` behind the
  * delete confirm.
  *

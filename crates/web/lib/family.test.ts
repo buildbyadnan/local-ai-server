@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isLlamaModel } from "@/lib/family";
 
 /**
- * The picker gate (§9 M6): every Llama variant this machine may have must
+ * The picker gate (M6): every Llama variant this machine may have must
  * pass, and nothing else may — especially `gemma4:12b`, the fixture this
  * machine actually carries.
  */

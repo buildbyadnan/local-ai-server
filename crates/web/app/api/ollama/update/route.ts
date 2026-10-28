@@ -6,7 +6,7 @@
  * for the newest version; a network failure is reported as an honest
  * "couldn't check" (the dialog never guesses a version it didn't see).
  *
- * Guard order per §3.3: Host first, before any process/network work.
+ * Guard order: Host first, before any process/network work.
  */
 import { ollamaVersion, requireLoopbackHost } from "@/lib/ollama";
 import { parseOllamaVersion } from "@/lib/system";

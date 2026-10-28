@@ -381,8 +381,8 @@ a.nav .item,
 }
 /* Session list (M7): searchable cards with a per-row delete — the raw
    JSON <pre> this replaces was the non-technical user's least favourite
-   feature (§9 M7). The list scrolls internally so 20 sessions can't blow
-   the sidebar (§5.5 space math, §10.5 space pass). */
+   feature. The list scrolls internally so 20 sessions can't blow the
+   sidebar. */
 .histlist {
   display: flex;
   flex-direction: column;
@@ -1517,7 +1517,7 @@ button.tname:focus-visible,
   background: var(--g);
   transition: width 0.2s linear;
 }
-/* No layer totals yet — sweep until Ollama reports them (§5.4). */
+/* No layer totals yet — sweep until Ollama reports them. */
 .pullbar .indet {
   display: block;
   height: 100%;

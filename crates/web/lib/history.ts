@@ -8,19 +8,19 @@
  *   subscribed to with `useSyncExternalStore`.
  *
  * Why the store now talks to the server instead of owning a
- * `localStorage` blob (§9 M7):
+ * `localStorage` blob (M7):
  * - **cross-profile truth**: every Chrome profile on this machine shares
  *   one history file through the API; localStorage is demoted to a *read
  *   cache* so first paint is still synchronous and flicker-free;
  * - **cross-tab truth**: mutations broadcast on `las.history` and the
- *   other tabs refetch — the server's row is the union, so row 19's
- *   "merge two divergent blobs" dance is no longer needed;
- * - **no quota cliff**: row 21's eviction ladder existed only because
+ *   other tabs refetch — the server's row is the union, so merging two
+ *   divergent local blobs by hand is no longer needed;
+ * - **no quota cliff**: the old eviction ladder existed only because
  *   localStorage caps at ~5 MB; the cache now *drops itself* on quota
  *   instead of dropping sessions, because the sessions live on disk.
  *
  * Store shape (unchanged contract for the components):
- * - server snapshot `null` → row 37's hydration skeleton; first client
+ * - server snapshot `null` → the hydration skeleton; first client
  *   snapshot reads the cache synchronously (never in an effect —
  *   `react-hooks/set-state-in-effect` forbids an effect-based read);
  * - `saveSession` applies optimistically, then POSTs through a single
@@ -35,7 +35,7 @@
 export interface ChatMessage {
   role: "user" | "assistant";
   content: string;
-  /** ISO timestamp stamped when the message is written (§5.5 write point b). */
+  /** ISO timestamp stamped when the message is written. */
   at: string;
   /**
    * M11 — the model this message was produced under (stamped at write
@@ -46,7 +46,7 @@ export interface ChatMessage {
 
 export interface ChatSession {
   id: string;
-  /** First user message, hard-cut (§5.5) — frozen once created. */
+  /** First user message, hard-cut — frozen once created. */
   title: string;
   /** Model that answered — stamped on every save, never a claim of one. */
   model: string;
@@ -63,7 +63,7 @@ export const SESSIONS_KEY = "las.sessions.v1";
 export const MIGRATED_KEY = "las.migrated.v1";
 /** Cross-tab signal: "history changed on the server, please refetch". */
 export const HISTORY_CHANNEL = "las.history";
-/** §5.5 caps — enforced server-side, mirrored when caching (M7). */
+/** Session caps — enforced server-side, mirrored when caching (M7). */
 export const MAX_SESSIONS = 20;
 export const MAX_MESSAGES = 100;
 
@@ -90,7 +90,7 @@ export function formatRelative(iso: string): string {
   return iso.slice(0, 10);
 }
 
-/** Case-insensitive search over the `.histrow` list (§5.5). */
+/** Case-insensitive search over the `.histrow` list. */
 export function filterSessions(
   sessions: ChatSession[],
   query: string,
@@ -107,7 +107,7 @@ export function filterSessions(
   );
 }
 
-/** Newest first; ties: more messages, then lexicographic id (§5.5 merge). */
+/** Newest first; ties: more messages, then lexicographic id. */
 function newer(a: ChatSession, b: ChatSession): number {
   if (a.updated_at !== b.updated_at) return a.updated_at > b.updated_at ? -1 : 1;
   if (a.messages.length !== b.messages.length) {
@@ -130,7 +130,7 @@ export function mergeSessions(
 }
 
 /**
- * §5.5 caps in one pure place (cache writes and imports share it): keep
+ * The caps in one pure place (cache writes and imports share it): keep
  * the newest 20 sessions, drop the oldest messages past 100 per session,
  * recompute `message_count`, and return the list newest-first.
  */
@@ -229,7 +229,7 @@ function storage(): Storage | null {
   }
 }
 
-/** Read the cache once: empty → `[]`, corrupt → reset (row 20). */
+/** Read the cache once: empty → `[]`, corrupt → reset. */
 function readCache(): ChatSession[] {
   const store = storage();
   if (store === null) return [];
@@ -248,7 +248,7 @@ function readCache(): ChatSession[] {
   }
   if (sessions !== null) return sessions;
   try {
-    store.removeItem(SESSIONS_KEY); // row 20: corrupt → welcome state
+    store.removeItem(SESSIONS_KEY); // corrupt → welcome state
   } catch {
     // nothing to reset if storage is unavailable
   }
@@ -258,7 +258,7 @@ function readCache(): ChatSession[] {
 /**
  * Mirror the snapshot into the cache (best-effort). On quota the cache
  * deletes *itself* rather than evicting sessions — sessions live in the
- * DB now, and the next load refetches them (row 21's ladder is retired).
+ * DB now, and the next load refetches them (the old eviction ladder is retired).
  */
 function writeCache(sessions: ChatSession[]): void {
   const store = storage();
@@ -376,7 +376,7 @@ async function refresh(): Promise<void> {
   }
 }
 
-/** One §5.5 write: optimistic locally, authoritative on the server. */
+/** One history write: optimistic locally, authoritative on the server. */
 function saveSession(draft: {
   id: string;
   model: string;
@@ -500,7 +500,7 @@ function getSnapshot(): ChatSession[] | null {
 export const historyStore = {
   subscribe,
   getSnapshot,
-  /** Stable `null` for server render + hydration (row 37 skeleton). */
+  /** Stable `null` for server render + hydration. */
   getServerSnapshot: (): ChatSession[] | null => null,
   getSaveError: (): boolean => saveError,
   getSaveErrorServerSnapshot: (): boolean => false,

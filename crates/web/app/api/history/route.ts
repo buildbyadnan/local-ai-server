@@ -7,7 +7,7 @@
  *            → `{ imported }` (the only path that keeps old timestamps)
  *   DELETE → `?id=…` one session, or `?all=1` everything → `{ deleted }`
  *
- * Guard order §3.3, in every handler: Host → Origin/POST → body →
+ * Guard order, in every handler: Host → Origin/POST → body →
  * validation → disk. `DELETE` deliberately requires `?all=1` for the
  * wipe: a client that loses track of a query string can wipe by accident,
  * and history deletion is irreversible.

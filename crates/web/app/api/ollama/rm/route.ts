@@ -4,7 +4,7 @@
  * The only destructive command the app may run (M5):
  * `ollama rm <tag>` via execFile with a tag that already passed the
  * registry-tag regex — no shell, no interpolation, no free-form input.
- * Guard order §3.3: Host → Origin → body → tag validation → exec.
+ * Guard order: Host → Origin → body → tag validation → exec.
  */
 import {
   isValidTag,

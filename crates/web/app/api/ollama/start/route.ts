@@ -1,5 +1,5 @@
 /**
- * POST /api/ollama/start — spawn `ollama serve`, detached (§9 M5's Start).
+ * POST /api/ollama/start — spawn `ollama serve`, detached (the Start button's request).
  *
  * Fixed argv, allowlisted binary (the same candidate list the status probe
  * walks), no shell: this is the one process the app starts, and it only
@@ -7,7 +7,7 @@
  * process was started" — the client polls /api/ollama/status and reports
  * honestly if it never comes up (port clash, missing GPU, …).
  *
- * Guard order §3.3: Host → Origin → body, before anything spawns.
+ * Guard order: Host → Origin → body, before anything spawns.
  */
 import {
   jsonError,

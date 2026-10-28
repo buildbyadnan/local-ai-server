@@ -9,13 +9,13 @@ function installed(name: string, parameterSize: string): InstalledModel {
 }
 
 /**
- * §10.3's asserted fixture table — the §6 matching rules (exact tag, else
+ * The asserted fixture table — the matching rules (exact tag, else
  * same family + ±25% of any nominal count) re-derived per case, including
  * the negatives: a foreign family with plausible params must never badge,
  * and a family member with wildly different params must badge only its own
  * guide.
  */
-describe("matchInstalled (§10.3 fixture table)", () => {
+describe("matchInstalled (fixture table)", () => {
   const cases: Array<{
     model: [string, string];
     slugs: string[];
@@ -39,7 +39,7 @@ describe("matchInstalled (§10.3 fixture table)", () => {
     {
       model: ["llama3.1:405b", "405B"],
       slugs: ["llama-3-1-405b"],
-      why: "installed >30B still badges its own guide (§6)",
+      why: "installed >30B still badges its own guide",
     },
     { model: ["mistral:7b", "7.6B"], slugs: [], why: "foreign family" },
     { model: ["qwen2.5:7b", "7.6B"], slugs: [], why: "foreign family (CLI's own test tag)" },
@@ -153,7 +153,7 @@ describe("baseName", () => {
   });
 });
 
-describe("isTextOnlyChat (§5.2 chip variant)", () => {
+describe("isTextOnlyChat (chip variant)", () => {
   it("marks vision and llama4 guides, nothing else", () => {
     const marked = allModels.filter(isTextOnlyChat).map((m) => m.ollamaTag);
     expect(marked.sort()).toEqual([

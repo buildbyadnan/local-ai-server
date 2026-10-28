@@ -5,7 +5,7 @@ import { join } from "node:path";
 
 /**
  * The M7 history DB against a real (temporary) file: creation, the server's
- * stamp rules, both §5.5 caps, deletes, and the migration import that is
+ * stamp rules, both session caps, deletes, and the migration import that is
  * the only path allowed to keep old timestamps.
  *
  * Each test gets a fresh module instance + file: the DB handle is cached

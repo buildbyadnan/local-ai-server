@@ -479,6 +479,6 @@ export const bigTierGuides: ModelGuide[] = [
       { label: "What to use instead", value: "Llama 4 Maverick · Llama 3.1 405B" },
     ],
     sourceNote:
-      "From the official Llama 4 model card (Maverick co-distilled from Behemoth; announced specs), the Hugging Face API (70-repo inventory, newest 28 Apr 2025), llama.com navigation and the meta-llama/llama-models GitHub repo (both checked 26 Oct 2026), plus the news record through 25 Oct 2026 — four independent checks documented in models/llama-models-complete-guide.md §10.",
+      "From the official Llama 4 model card (Maverick co-distilled from Behemoth; announced specs), the Hugging Face API (70-repo inventory, newest 28 Apr 2025), llama.com navigation and the meta-llama/llama-models GitHub repo (both checked 26 Oct 2026), plus the news record through 25 Oct 2026 — four independent checks documented in models/llama-models-complete-guide.md.",
   },
 ];

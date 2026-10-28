@@ -8,8 +8,8 @@
  *     `parameter_size` within ±25% of any nominal count the guide covers;
  *  3. guides without an `ollamaTag` never match (they are guide-only).
  *
- * Pure functions so the whole rule is unit-testable against §10.3's
- * fixture table — the browser never re-derives it.
+ * Pure functions so the whole rule is unit-testable against the
+ * fixture table in `match.test.ts` — the browser never re-derives it.
  */
 import type { ModelGuide } from "@/data/models";
 import type { InstalledModel } from "@/lib/ollama-types";
@@ -68,7 +68,7 @@ export function matchInstalled(
 
 /**
  * Chat in this UI has no image input, so an installed vision/llama4 model
- * gets the `✓ installed (text chat)` variant of the chip (§5.2). Keyed off
+ * gets the `✓ installed (text chat)` variant of the chip. Keyed off
  * the guide's tag — the guide is what the chip annotates.
  */
 export function isTextOnlyChat(guide: ModelGuide): boolean {

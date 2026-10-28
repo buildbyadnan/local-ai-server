@@ -2,7 +2,7 @@
  * GET /api/system — a fresh snapshot for the System-info dialog
  * (M5).
  *
- * Request-time by construction (§3.3): the Host guard reads
+ * Request-time by construction: the Host guard reads
  * `request.headers` first, so no prerender can ever run the collectors,
  * and every collector below is a value — no segment-config exports.
  */

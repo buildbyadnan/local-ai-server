@@ -10,8 +10,8 @@ companions the [`llama` CLI](../llama-cli) — same product, graphical surface.
 ## Quick start — run it on your machine
 
 You don't need to know AI, and nothing you type ever leaves your computer:
-the app talks to a local server on `127.0.0.1` and stores its chats in your
-browser.
+the app talks to a local server on `127.0.0.1` and stores its chats in a
+local database on this machine.
 
 **You need four free things:**
 
@@ -46,7 +46,7 @@ Then open **<http://127.0.0.1:3000>** in your browser.
 - the sidebar's **OLLAMA** row reads `● Connected`;
 - the right-hand panel lists `llama3.2:latest` — click it to select it;
 - a message you type streams a reply, and it shows up under **CHAT HISTORY**
-  as raw JSON (saved in *this browser* only, never uploaded).
+  as a session you can reopen (saved on this machine, never uploaded).
 
 Press `Ctrl+C` in the terminal to stop the app.
 
@@ -70,7 +70,7 @@ pnpm install     # once
 pnpm dev         # http://127.0.0.1:3000
 pnpm lint        # eslint (core-web-vitals + TS)
 pnpm test        # vitest unit suite
-pnpm build       # production build (28 routes)
+pnpm build       # production build (33 routes)
 pnpm start       # serve the production build (bound to 127.0.0.1)
 ```
 
@@ -100,18 +100,22 @@ app/                  Routes + the single stylesheet (globals.css)
   llama/[slug]/       The 19 model guides (static params, plain language)
   api/ollama/         Status / streaming chat / pull — proxying OLLAMA_HOST
 components/           ModelProvider, Sidebar (nav + session history), CenterChat,
-                      AiModule (model tree + picker), Pull, OllamaStatus
+                      AiModule (model tree + picker), Pull, OllamaStatus, Footer,
+                      ChatText (the reply markdown renderer)
 data/models/          Single source of truth for every model: tree, directory,
                       sibling links and generateStaticParams all derive from it
-lib/                  Pure helpers + their unit tests: ndjson, match, history,
-                      ollama (tag validation, status fetch, session store)
+lib/                  Pure helpers + their unit tests: ndjson, match, history
+                      (SQLite session store), markdown (reply renderer),
+                      ollama (tag validation, status fetch)
 proxy.ts              Rewrites unknown /llama/<slug> to the static 404
 ```
 
 The chat is wired to Ollama on this machine: `/api/ollama/*` route handlers
 proxy the local server, replies stream token by token, models install
-straight from the tree, and conversations persist to this browser's
-`localStorage`. Nothing leaves the machine — no cloud, no accounts.
+straight from the tree, and conversations persist to a SQLite file on disk
+(`lib/history-db.ts`, shared by every browser profile on the machine).
+Replies render as markdown — code blocks, headings, lists and bold all land
+as real elements. Nothing leaves the machine — no cloud, no accounts.
 
 ## Architecture notes (Next.js 16)
 
@@ -130,8 +134,11 @@ configurations that look odd but are load-bearing:
   URLs always return a real `404`.
 
 Styling is one hand-rolled stylesheet (tokens → minimal reset → components),
-no CSS framework. Layout fills the viewport ≥861px (slim `--gut` frame,
-internal panel scrolling) and falls back to natural page scroll below that.
+no CSS framework. The layout is edge-to-edge: the shell fills the viewport's
+length and breadth, columns scale in four breakpoints with the chat absorbing
+the rest, and below 620px the panels stack into one column with the credit
+bar pinned to the bottom. Every page ends with the credit line
+**Developed by Adnan · github.com/buildbyadnan**.
 
 ## Repo fit
 

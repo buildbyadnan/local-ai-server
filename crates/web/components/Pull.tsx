@@ -3,7 +3,7 @@
 /**
  * Pull flow: the inline confirm in a tree row, the
  * global progress row, the terminal note on the row that owns the pull, and
- * the no-models starter CTA (§8's quoted sentence) used by both the chat's
+ * the no-models starter CTA (the quoted sentence) used by both the chat's
  * empty state and the picker's empty state.
  *
  * All pull *state* lives in `ModelProvider` — these pieces only render it,
@@ -13,11 +13,11 @@ import { useState } from "react";
 import { allModels, type ModelGuide } from "@/data/models";
 import { useOllama } from "@/components/ModelProvider";
 
-/** §6 starter defaults — the two tags §8's no-models sentence offers. */
+/** Starter defaults — the two tags the no-models sentence offers. */
 const STARTER_DEFAULT = "llama3.1:8b";
 const STARTER_SMALLER = "llama3.2:3b";
 
-/** The guide behind a registry tag (every tagged guide is unique — §10.3). */
+/** The guide behind a registry tag (every tagged guide is unique). */
 function guideFor(tag: string): ModelGuide {
   const guide = allModels.find((m) => m.ollamaTag === tag);
   if (!guide) throw new Error(`no guide carries ollamaTag ${tag}`);
@@ -25,7 +25,7 @@ function guideFor(tag: string): ModelGuide {
 }
 
 /**
- * §6 records sizes as captured ("2.0 GB"); §8 quotes the starter's as
+ * Guides record sizes as captured ("2.0 GB"); the no-models sentence quotes the starter's as
  * "2 GB". Dropping a trailing `.0` lets both quoted strings render verbatim
  * from the single stored value.
  */
@@ -33,7 +33,7 @@ function sizeText(pullSize: string): string {
   return pullSize.replace(/^(\d+)\.0(?=\s)/, "$1");
 }
 
-/** §5.4 confirm — name + size hint, plus the >30B warning when it applies. */
+/** Confirm — name + size hint, plus the >30B warning when it applies. */
 function PullConfirm({
   guide,
   onStart,
@@ -80,9 +80,8 @@ function PullConfirm({
 }
 
 /**
- * The tree's Pull control (§5.2): confirm inline in the row; disabled with
- * a visible reason while Ollama is down (row 15) or another pull runs
- * (row 17).
+ * The tree's Pull control: confirm inline in the row; disabled with
+ * a visible reason while Ollama is down or another pull runs.
  */
 export function PullButton({ guide }: { guide: ModelGuide }) {
   const { status, pulling } = useOllama();
@@ -131,7 +130,7 @@ export function PullNote({ tag }: { tag: string | undefined }) {
   return <p className={`pullnote ${tone}`}>{pullNote.text}</p>;
 }
 
-/** The one progress row (§5.4) — rendered once, above the model tree. */
+/** The one progress row — rendered once, above the model tree. */
 export function PullStatus() {
   const { pulling, cancelPull } = useOllama();
   if (!pulling) return null;
@@ -168,9 +167,9 @@ export function PullStatus() {
 }
 
 /**
- * §8's no-models sentence with both starter tags as live pull triggers —
- * shown in the chat's empty state (§5.3 row 2) and in the picker's empty
- * state (§7 row 3). While a starter is confirming, the sentence is replaced
+ * The no-models sentence with both starter tags as live pull triggers —
+ * shown in the chat's empty state and in the picker's empty state.
+ * While a starter is confirming, the sentence is replaced
  * by its confirm so the two never compete for the same line.
  *
  * `onPullStart` lets the picker close its menu once a pull begins.

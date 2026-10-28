@@ -2,13 +2,13 @@ import { describe, expect, it } from "vitest";
 import { allModels } from "@/data/models";
 
 /**
- * §10.3 "data integrity": the tagging that drives the whole pull flow must
- * match §6's asserted table exactly (Oct 2026 capture) — a missing or
+ * Data integrity: the tagging that drives the whole pull flow must
+ * match the asserted table below exactly (Oct 2026 capture) — a missing or
  * mistyped `pullSize` would mis-size a confirm dialog, a wrong
  * `paramsBillions` would mis-badge an installed model.
  */
-describe("guide tagging (§6 value table)", () => {
-  /** slug → [tag, pullSize, params] exactly as §6 asserts them. */
+describe("guide tagging (value table)", () => {
+  /** slug → [tag, pullSize, params] exactly as asserted below. */
   const table: Record<string, [string, string, number[]]> = {
     "llama-2-7b-13b": ["llama2:7b", "3.8 GB", [7, 13]],
     "codellama-7b-13b": ["codellama:7b", "3.8 GB", [7, 13]],
@@ -32,7 +32,7 @@ describe("guide tagging (§6 value table)", () => {
     expect(allModels.filter((m) => m.ollamaTag)).toHaveLength(15);
   });
 
-  it("the tagged set is exactly §6's table", () => {
+  it("the tagged set is exactly the table above", () => {
     const tagged = allModels
       .filter((m) => m.ollamaTag)
       .map((m) => m.slug)

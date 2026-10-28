@@ -137,14 +137,14 @@ describe("first paint", () => {
   it("server snapshot is null (hydration skeleton), cache read is sync", async () => {
     ls.set("las.sessions.v1", JSON.stringify([session("ses_cached")]));
     const current = await loadStore();
-    expect(current.getServerSnapshot()).toBeNull(); // row 37 SSR shape
+    expect(current.getServerSnapshot()).toBeNull(); // SSR shape
     const snap = current.getSnapshot();
     expect(snap).not.toBeNull();
     expect(snap?.[0].id).toBe("ses_cached"); // before any fetch resolved
     expect(fetchMock).not.toHaveBeenCalled(); // getSnapshot never fetches
   });
 
-  it("corrupt cache resets to [] without throwing (row 20)", async () => {
+  it("corrupt cache resets to [] without throwing", async () => {
     ls.set("las.sessions.v1", "{not json");
     const current = await loadStore();
     expect(current.getSnapshot()).toEqual([]);

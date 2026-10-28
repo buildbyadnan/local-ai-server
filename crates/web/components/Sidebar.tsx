@@ -162,7 +162,7 @@ export default function Sidebar() {
         )}
       </nav>
 
-      {/* System info sits directly above OLLAMA (§9 M5) — same row shape,
+      {/* System info sits directly above OLLAMA — same row shape,
           a dialog instead of an inline expansion. */}
       <SystemInfo />
 

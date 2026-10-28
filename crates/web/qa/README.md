@@ -1,7 +1,7 @@
 # QA — visual references
 
 Reference screenshots for the Web UI baseline suite.
-Nothing here runs in CI (CI has no browser, and §10.3 forbids an e2e runner):
+Nothing here runs in CI (CI has no browser, and the gate keeps e2e out of CI):
 capturing and diffing are explicit, local, human steps.
 
 ## What's committed
@@ -18,12 +18,12 @@ home-375x812.png     guide-375x812.png     directory-375x812.png
 home-1440x768-sidebar-expanded.png
 ```
 
-## How they were captured (deviation from the plan, recorded)
+## How they were captured
 
-§10.6.2 says `npx playwright screenshot`. **Playwright is not installed in
-this environment** (`node_modules` has no `playwright`, and installing it
-means downloading a browser bundle), so the same job is done with the
-system's headless Chrome driven over the DevTools protocol:
+`npx playwright screenshot` is the obvious tool, but **Playwright is not
+installed in this environment** (`node_modules` has no `playwright`, and
+installing it means downloading a browser bundle). The same job is done
+with the system's headless Chrome driven over the DevTools protocol:
 
 - same browser engine, same URLs, same viewport sizes, same
   `--hide-scrollbars` behaviour;
@@ -59,14 +59,17 @@ whatever that machine has.
 | Check | Result |
 | ----- | ------ |
 | `tsc --noEmit` / `pnpm lint` | 0 errors / clean |
-| `pnpm test` | 200/200 |
+| M10 shell matrix (CDP, 61 checks: edge-to-edge + credit bar + mobile first screen) | 61/61 pass |
+| M11 readability matrix (CDP, 14 checks: 14px/leading/measure + per-message model) | 14/14 pass |
+| chat audit (CDP, 80 checks: all five installed models chatted for real, markdown rendering, 6 viewports 375→2560) | 80/80 pass |
+| `pnpm test` | 224/224 |
 | `pnpm build` | 33/33 routes generated |
 | M9 responsive matrix (CDP, 30 checks: 8 widths × 3 heights overflow/clipping + modal at 768/1024/1920) | 30/30 pass |
 | M8 parallel matrix (CDP, 21 checks: per-tab selection, concurrent streams, queue wait line, System info) | 21/21 pass |
 | M6 picker matrix (CDP, 30 checks) | 30/30 pass |
 | M5 modal matrix (CDP, 42 checks) | 42/42 pass |
-| M4 history matrix (CDP, 33 checks: rows 17–38 + §8 copy + space pass + a11y) | 33/33 pass |
+| M4 history matrix (CDP, 33 checks: rows, copy, space pass, a11y) | 33/33 pass |
 | M3 pull matrix (CDP, 35 checks, against the stand-in fleet) | 35/35 pass |
 | UI audit matrix (CDP, 144 checks) | 144/144 pass |
-| internal link crawl (§10.6.1) | 23 pages, all 200; bogus slug 404; foreign `Host` → 403; cross `Origin` → 403; `Content-Encoding` → 415 |
+| internal link crawl | 23 pages, all 200; bogus slug 404; foreign `Host` → 403; cross `Origin` → 403; `Content-Encoding` → 415 |
 | `bazel build //...` | green (`.bazelignore` keeps this crate out) |

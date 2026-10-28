@@ -39,7 +39,7 @@ export interface ModelGuide {
   ollamaTag?: string;
   /** Download size for the confirm step ("4.9 GB"). Required with `ollamaTag`. */
   pullSize?: string;
-  /** Nominal parameter counts (billions) — §6's matching rule compares an
+  /** Nominal parameter counts (billions) — the matching rule compares an
       installed `parameter_size` against these at ±25%. Required with
       `ollamaTag`. */
   paramsBillions?: number[];

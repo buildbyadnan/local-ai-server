@@ -37,7 +37,7 @@ type ErrorKind =
   | "send"
   /** Ollama's own {"error"} line (bad tag, server-side failure) */
   | "stream"
-  /** HTTP 413 — payload over the proxy's 1 MiB guard rail (row 30) */
+  /** HTTP 413 — payload over the proxy's 1 MiB guard rail */
   | "tooLong"
   /** context window exceeded — retrying the same payload fails again */
   | "overflow";
@@ -56,11 +56,11 @@ function isOverflow(text: string): boolean {
  * The chat pane's inner view: it owns the conversation and the streaming
  * pipeline: guarded send, split-safe NDJSON
  * parsing via `lib/ndjson`, Stop via AbortController, warm-up line, and the
- * honest error states from the §7 matrix. The provider only carries the
+ * honest error states for every failure mode. The provider only carries the
  * coordination flags (streaming, chat-empty, an active pull) so other
  * panels can gate on them.
  *
- * Session lifecycle (§5.5): `seed` (the session this conversation opens)
+ * Session lifecycle: `seed` (the session this conversation opens)
  * initializes `messages` and the session id at mount; every write goes
  * through `persist()` — on send (creates the session) and at every stream
  * end (done, Stop, or error), so a reload restores exactly what was on
@@ -129,7 +129,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
   }
 
   /**
-   * §5.5 write points (a)+(b)+(c): create on first send, stamp `updated_at`
+   * Three write points: create on first send, stamp `updated_at`
    * on every save, and re-write at every stream end — a Stop or a crashed
    * reply survives reload (rows 34/35).
    */
@@ -211,7 +211,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
     const queueTimer = window.setTimeout(() => setQueued(true), 2500);
 
     // Whether *this* run has appended reply text — Stop may only mark the
-    // reply it actually cut short, never an earlier, completed one (row 28).
+    // reply it actually cut short, never an earlier, completed one.
     let producedText = false;
     let loggedBadLine = false;
 
@@ -219,7 +219,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
       const parsed = parseJsonLine<StreamLine>(line);
       if (!parsed) {
         // Blank lines are normal framing; a damaged one is logged once per
-        // stream and skipped — it must never kill the reply (row 29).
+        // stream and skipped — it must never kill the reply.
         if (line.trim().length > 0 && !loggedBadLine) {
           loggedBadLine = true;
           console.warn("CenterChat: skipping a malformed stream line");
@@ -309,7 +309,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
         setQueued(false);
         setWarming(false);
         setStreaming(false);
-        persist(); // §5.5(c) — done, Stop or error, the session is written
+        persist(); // final write — done, Stop or error, the session is written
         refresh(); // re-read /api/ps so the next send knows it is warm
       });
   }
@@ -334,7 +334,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
       },
     ]);
     setDraft("");
-    persist(); // §5.5(a) — the first send creates the session
+    persist(); // first write — the first send creates the session
     run(payload);
   }
 
@@ -346,7 +346,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
   const down = status !== null && !status.running;
 
   /**
-   * Expand + scroll to the sidebar's OLLAMA section (row 1, position-neutral).
+   * Expand + scroll to the sidebar's OLLAMA section (position-neutral).
    * Keyed by id — `.histbtn` is shared with the AI History toggle (and the
    * future "＋ New chat" control), so a class query would be order-dependent.
    */
@@ -520,7 +520,7 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
 }
 
 /**
- * Keyed wrapper (§5.5): the conversation remounts when the model changes
+ * Keyed wrapper: the conversation remounts when the model changes
  * (the reset rule), when another session opens or a new chat starts (the
  * explicit `sessionChoice`), and once when storage hydration completes —
  * so the restored session seeds the first real render while the skeleton

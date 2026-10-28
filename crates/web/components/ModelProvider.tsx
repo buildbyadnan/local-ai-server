@@ -50,7 +50,7 @@ interface PullLine {
 const CONNECTION_LOST =
   "Connection lost mid-download — Ollama will finish it next time you pull.";
 
-/** Live progress of the one pull allowed at a time (§5.4). */
+/** Live progress of the one pull allowed at a time. */
 export interface PullProgress {
   /** Tag being downloaded — the tree row and chat note key off it. */
   tag: string;
@@ -63,11 +63,11 @@ export interface PullProgress {
 }
 
 export type PullNoteKind =
-  /** row 13 — Ollama's own failure message */
+  /** Ollama's own failure message */
   | "error"
-  /** row 14 — the user cancelled */
+  /** the user cancelled */
   | "stopped"
-  /** row 16 — finished while the chat was busy */
+  /** finished while the chat was busy */
   | "ready";
 
 /** Terminal outcome of the last pull, rendered inline in its tree row. */
@@ -84,7 +84,7 @@ export interface OllamaContext {
   status: OllamaStatus | null;
   /** Tag of the model that will answer, or null when none is installed. */
   selected: string | null;
-  /** Previously-selected model that vanished from this machine (row 18). */
+  /** Previously-selected model that vanished from this machine. */
   removed: string | null;
   /**
    * M6 — a non-Llama model was offered as the selection (persisted pick or
@@ -94,7 +94,7 @@ export interface OllamaContext {
   nonLlama: string | null;
   /**
    * Selection: user picks pass `{ restart: true }` to also mint a fresh
-   * conversation (§5.5's model-change reset); programmatic switches —
+   * conversation (the model-change reset); programmatic switches —
    * session restore, pull auto-select — keep the open conversation.
    */
   select: (name: string, opts?: { restart?: boolean }) => void;
@@ -106,15 +106,15 @@ export interface OllamaContext {
   /** True while the open chat has no messages — gates the switch confirm. */
   chatEmpty: boolean;
   setChatEmpty: (value: boolean) => void;
-  /** The single in-flight pull, or null (one at a time — row 17). */
+  /** The single in-flight pull, or null (one at a time). */
   pulling: PullProgress | null;
   /** Outcome of the last finished pull (red error / stop / ready line). */
   pullNote: PullNote | null;
-  /** Start pulling `tag`; `pullSize` is the guide's estimate (§5.4). */
+  /** Start pulling `tag`; `pullSize` is the guide's estimate. */
   startPull: (tag: string, pullSize: string) => void;
   /** Abort the pull fetch — Ollama keeps whatever layers it already wrote. */
   cancelPull: () => void;
-  /** Persisted sessions; `null` until browser storage is read (row 37). */
+  /** Persisted sessions; `null` until browser storage is read. */
   sessions: ChatSession[] | null;
   /** Which conversation is open — the latest session, or a specific id. */
   sessionChoice: "latest" | string;
@@ -131,10 +131,10 @@ export interface OllamaContext {
   openSession: (id: string) => void;
   /** ＋ New chat / "Start new chat": a fresh, not-yet-saved conversation. */
   startNewChat: () => void;
-  /** Sidebar search, filtering the `.histrow` list (§5.5). */
+  /** Sidebar search, filtering the `.histrow` list. */
   query: string;
   setQuery: (value: string) => void;
-  /** The last save hit storage quota even after eviction (row 21). */
+  /** The last save hit storage quota even after eviction. */
   saveError: boolean;
 }
 
@@ -159,8 +159,8 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const [pulling, setPulling] = useState<PullProgress | null>(null);
   const [pullNote, setPullNote] = useState<PullNote | null>(null);
 
-  // The §5.5 session store: one subscription feeds the sidebar, CenterChat's
-  // seed and the restore rule; `saveError` is row 21's quota notice.
+  // The session store: one subscription feeds the sidebar, CenterChat's
+  // seed and the restore rule; `saveError` is the storage-quota notice.
   const sessions = useSyncExternalStore(
     historyStore.subscribe,
     historyStore.getSnapshot,
@@ -172,7 +172,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
     historyStore.getSaveErrorServerSnapshot,
   );
   const [query, setQuery] = useState("");
-  /** "latest" until the user opens a row or starts a new chat (§5.5). */
+  /** "latest" until the user opens a row or starts a new chat. */
   const [sessionChoice, setSessionChoice] = useState<"latest" | string>(
     "latest",
   );
@@ -211,7 +211,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   const chatEmptyRef = useRef(true);
   /** The in-flight pull's controller — the provider's one-at-a-time lock. */
   const pullRef = useRef<AbortController | null>(null);
-  /** §5.5 model-on-restore applies on the first status, never again. */
+  /** Model-on-restore applies on the first status, never again. */
   const restoreRef = useRef(false);
   /** M6: a non-Llama pick was refused — don't silently auto-pick after it. */
   const blockedRef = useRef(false);
@@ -256,7 +256,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
           setStatus(next);
         }
         setPhase("ready");
-        // §5.5 model-on-restore, once: the newest session's model answers
+        // Model-on-restore, once: the newest session's model answers
         // the conversation restored with it — silently, if still installed
         // *and* usable for chat here (M6: a gemma session must not smuggle
         // gemma back into the selection — it gets the refusal notice).
@@ -333,7 +333,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
       return;
     }
 
-    // Running and the current selection is gone → row 18 notice.
+    // Running and the current selection is gone → the vanished-model notice.
     if (current !== null) setRemoved(current);
 
     // A deliberate refusal stays visible instead of being papered over by
@@ -411,7 +411,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
         return;
       }
       applySelection(name);
-      // §5.5 reset rule: a user pick starts a fresh conversation — its
+      // Reset rule: a user pick starts a fresh conversation — its
       // messages are already written by the save points. Programmatic
       // switches (restore, pull auto-select) pass nothing and keep it.
       if (opts?.restart) setSessionChoice(newSessionId());
@@ -443,17 +443,17 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const cancelPull = useCallback(() => {
-    pullRef.current?.abort(); // §3.5 — aborts the proxy, which aborts Ollama
+    pullRef.current?.abort(); // aborts the proxy, which aborts Ollama
   }, []);
 
   /**
-   * Pull `tag` (§5.4): one at a time, aggregated progress across layers,
+   * Pull `tag`: one at a time, aggregated progress across layers,
    * terminal outcome as an inline note on that guide's row. Success
    * refreshes the model list and auto-selects only when the chat is empty.
    */
   const startPull = useCallback(
     (tag: string, pullSize: string) => {
-      if (pullRef.current) return; // row 17 — one pull at a time
+      if (pullRef.current) return; // one pull at a time
       const controller = new AbortController();
       pullRef.current = controller;
       setPullNote(null);
@@ -478,7 +478,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
           tag,
           status: statusText,
           pullSize,
-          // No totals yet → null: the bar renders indeterminate (§5.4).
+          // No totals yet → null: the bar renders indeterminate.
           percent: total > 0 ? Math.min(100, (completed / total) * 100) : null,
         };
       };
@@ -490,10 +490,10 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
         setPulling(snapshot());
       };
 
-      /** One pull line → failure text (row 13), or null to keep reading. */
+      /** One pull line → failure text, or null to keep reading. */
       const handleLine = (line: string): string | null => {
         const parsed = parseJsonLine<PullLine>(line);
-        if (!parsed) return null; // blank or damaged line: never fatal (row 29)
+        if (!parsed) return null; // blank or damaged line: never fatal
         if (typeof parsed.error === "string") return parsed.error;
         if (typeof parsed.status === "string") {
           if (parsed.status === "success") sawSuccess = true;
@@ -502,7 +502,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
             parsed.status.replace(/\s*sha256:[0-9a-f]+\b.*/, "").trim() ||
             parsed.status;
         }
-        // Last write wins per digest (§5.4).
+        // Last write wins per digest.
         if (
           typeof parsed.digest === "string" &&
           typeof parsed.total === "number" &&
@@ -570,7 +570,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
           note =
             err instanceof DOMException && err.name === "AbortError"
               ? {
-                  // Row 14 + §8 — the layers already written stay on disk.
+                  // The layers already written stay on disk.
                   tag,
                   kind: "stopped",
                   text: "Download stopped. Ollama may pick it back up next time.",
@@ -592,7 +592,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
         if (note === null && !sawSuccess) {
           // The body ended without Ollama's success line — a stream that
           // stopped early is the same honest outcome as a dropped socket
-          // (row 31), never a silent "it worked".
+          // a dropped socket, never a silent "it worked".
           note = { tag, kind: "error", text: CONNECTION_LOST };
         }
         if (note !== null) {
@@ -600,7 +600,7 @@ export default function ModelProvider({ children }: { children: ReactNode }) {
           return;
         }
 
-        // Success (§5.4): re-read tags, then auto-select only if the chat
+        // Success: re-read tags, then auto-select only if the chat
         // is empty — otherwise offer the switch instead of hijacking it.
         void refresh().then(() => {
           if (chatEmptyRef.current) {
