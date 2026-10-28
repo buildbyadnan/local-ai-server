@@ -31,6 +31,39 @@ import {
   type ChatSession,
 } from "@/lib/history";
 
+/**
+ * M12 — the change feed. Every write here notifies in-process subscribers;
+ * `GET /api/history/stream` turns those notifications into Server-Sent
+ * Events for every open tab on this machine.
+ *
+ * Why the server has to carry it: a `BroadcastChannel` message only reaches
+ * tabs in the *same* Chrome profile — a second profile (another window, a
+ * guest profile, another user on this box) shares the SQLite file but never
+ * the channel. The SSE connection is the bridge across that boundary, and
+ * the in-process emitter is what feeds it without polling the disk.
+ */
+type ChangeListener = () => void;
+const changeListeners = new Set<ChangeListener>();
+
+/** Subscribe to writes; returns the unsubscribe function. */
+export function onHistoryChange(listener: ChangeListener): () => void {
+  changeListeners.add(listener);
+  return () => {
+    changeListeners.delete(listener);
+  };
+}
+
+/** Notify subscribers — a throwing listener must never fail the write. */
+function emitHistoryChange(): void {
+  for (const listener of [...changeListeners]) {
+    try {
+      listener();
+    } catch {
+      // one broken subscriber must not take down the rest
+    }
+  }
+}
+
 /** Where this server keeps its history file (QA fleet overrides per port). */
 export function historyDbFile(): string {
   const fromEnv = process.env.HISTORY_DB_PATH?.trim();
@@ -237,6 +270,7 @@ export function saveSession(draft: {
       JSON.stringify(session.messages),
     );
   enforceSessionCap();
+  emitHistoryChange();
   return session;
 }
 
@@ -293,19 +327,24 @@ export function importSessions(raw: unknown): number {
     imported += 1;
   }
   enforceSessionCap();
+  if (imported > 0) emitHistoryChange();
   return imported;
 }
 
 /** Delete one session; `false` when the id was never there. */
 export function deleteSession(id: string): boolean {
   const result = conn().prepare("DELETE FROM sessions WHERE id = ?").run(id);
-  return Number(result.changes) > 0;
+  const deleted = Number(result.changes) > 0;
+  if (deleted) emitHistoryChange();
+  return deleted;
 }
 
 /** Delete everything (the typed-confirm "Delete all history" path). */
 export function deleteAll(): number {
   const result = conn().prepare("DELETE FROM sessions").run();
-  return Number(result.changes);
+  const deleted = Number(result.changes);
+  if (deleted > 0) emitHistoryChange();
+  return deleted;
 }
 
 /** For the System-info dialog: what the history file actually holds. */

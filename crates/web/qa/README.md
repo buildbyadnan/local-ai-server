@@ -54,16 +54,17 @@ whatever that machine has.
 | 2026-10-27 | all 10 | initial capture at M4 | first committed references (M4: real chat history, session rows, hydration states) |
 | 2026-10-27 | all 10 | M9 responsive pass recapture | same routes/viewports, new shell: fluid `min(1680px, 100%)` cap, the four-tier ladder (768–1023 / 1024–1279 / 1280–1599 / ≥1600), sidebar OLLAMA-row overflow fix, modal at `min(720px, 92vw)` — every shot re-taken on the M9 build (first-visit state, hermetic DB reset) |
 
-## The rest of the QA gate (as of M9)
+## The rest of the QA gate (as of M12)
 
 | Check | Result |
 | ----- | ------ |
 | `tsc --noEmit` / `pnpm lint` | 0 errors / clean |
 | M10 shell matrix (CDP, 61 checks: edge-to-edge + credit bar + mobile first screen) | 61/61 pass |
 | M11 readability matrix (CDP, 14 checks: 14px/leading/measure + per-message model) | 14/14 pass |
+| M12 realtime matrix (CDP, 24 checks: two Chrome profiles chat both ways over SSE, cross-profile delete, same-profile tab in 465 ms, 4 s poll fallback with `EventSource` removed) | 24/24 pass |
 | chat audit (CDP, 80 checks: all five installed models chatted for real, markdown rendering, 6 viewports 375→2560) | 80/80 pass |
-| `pnpm test` | 224/224 |
-| `pnpm build` | 33/33 routes generated |
+| `pnpm test` | 227/227 |
+| `pnpm build` | 34/34 routes generated |
 | M9 responsive matrix (CDP, 30 checks: 8 widths × 3 heights overflow/clipping + modal at 768/1024/1920) | 30/30 pass |
 | M8 parallel matrix (CDP, 21 checks: per-tab selection, concurrent streams, queue wait line, System info) | 21/21 pass |
 | M6 picker matrix (CDP, 30 checks) | 30/30 pass |

@@ -163,6 +163,42 @@ function Conversation({ seed }: { seed: ChatSession | null }) {
     setChatEmpty(messages.length === 0);
   }, [messages.length, setChatEmpty]);
 
+  /**
+   * M12 — adopt a write made *elsewhere* (another Chrome profile, another
+   * tab) while this conversation sits idle: the server row is the truth,
+   * so a reply someone else got here appears without an F5.
+   *
+   * Two guards keep it from ever fighting the local UI:
+   * - never while streaming/warming — the local buffer is authoritative
+   *   then, and a mid-reply swap would truncate the text on screen;
+   * - only when the remote actually has something this list lacks (more
+   *   messages, or a different last one) — our own `persist()` echo has
+   *   the same `at` stamps, so it never re-adopts itself into a flicker.
+   */
+  useEffect(() => {
+    if (seed === null || streaming || warming) return;
+    if (seed.id !== sessionRef.current) return;
+    const remote = seed.messages;
+    const local = messagesRef.current;
+    const lastRemote = remote[remote.length - 1];
+    const lastLocal = local[local.length - 1];
+    const remoteIsNewer =
+      remote.length > local.length ||
+      (lastRemote !== undefined &&
+        lastLocal !== undefined &&
+        (lastRemote.at !== lastLocal.at ||
+          lastRemote.content !== lastLocal.text));
+    if (!remoteIsNewer) return;
+    apply(
+      remote.map((m) => ({
+        role: m.role,
+        text: m.content,
+        at: m.at,
+        model: m.model,
+      })),
+    );
+  }, [seed, streaming, warming]);
+
   // Keep the newest message in view whenever the conversation grows.
   useEffect(() => {
     const el = scrollRef.current;

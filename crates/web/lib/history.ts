@@ -15,6 +15,11 @@
  * - **cross-tab truth**: mutations broadcast on `las.history` and the
  *   other tabs refetch — the server's row is the union, so merging two
  *   divergent local blobs by hand is no longer needed;
+ * - **cross-profile truth (M12)**: a BroadcastChannel never leaves its own
+ *   Chrome profile, so writes are also relayed by the server over
+ *   `GET /api/history/stream` (SSE); a visibility-gated 4 s poll covers
+ *   the moments the stream is down, and every path ends in the same plain
+ *   `refresh()` — no F5 anywhere;
  * - **no quota cliff**: the old eviction ladder existed only because
  *   localStorage caps at ~5 MB; the cache now *drops itself* on quota
  *   instead of dropping sessions, because the sessions live on disk.
@@ -466,6 +471,86 @@ function onMessage(): void {
   void refresh();
 }
 
+/* ─────────────────── M12 realtime: SSE + poll fallback ─────────────────── */
+
+/** Cross-profile push (other tabs use BroadcastChannel — same story). */
+let source: EventSource | null = null;
+/** Last-resort refresh while the stream is down, gated on visibility. */
+let poll: ReturnType<typeof setInterval> | null = null;
+const POLL_MS = 4000;
+
+function streamOpen(): boolean {
+  return source !== null && source.readyState === EventSource.OPEN;
+}
+
+function stopPolling(): void {
+  if (poll !== null) {
+    clearInterval(poll);
+    poll = null;
+  }
+}
+
+function startPolling(): void {
+  if (poll !== null || typeof document === "undefined") return;
+  poll = setInterval(() => {
+    // Hidden tabs stay quiet; a visible one reconciles every 4 s until the
+    // stream is back (the interval also stops itself on reconnect).
+    if (document.visibilityState !== "visible") return;
+    if (streamOpen()) {
+      stopPolling();
+      return;
+    }
+    void refresh();
+  }, POLL_MS);
+}
+
+/** A tab returning to the foreground shouldn't wait out the poll interval. */
+function onVisibility(): void {
+  if (typeof document !== "undefined" && document.visibilityState === "visible") {
+    if (streamOpen()) return; // the stream already tells us about changes
+    void refresh();
+  }
+}
+
+/**
+ * Open the push stream and arm the fallback. Every event means one thing —
+ * "history moved on this machine" — so the response is always the same
+ * plain GET, identical to what a page load does.
+ */
+function startRealtime(): void {
+  if (typeof window === "undefined") return;
+  if (typeof EventSource !== "undefined") {
+    try {
+      source = new EventSource(`${API}/stream`);
+      source.onopen = () => stopPolling(); // healthy stream → no polling
+      source.onmessage = () => void refresh();
+      source.onerror = () => startPolling(); // down → poll until it reconnects
+    } catch {
+      source = null;
+    }
+  }
+  startPolling(); // covers the gap before `open` (and browsers without SSE)
+  if (typeof window !== "undefined" && typeof window.addEventListener === "function") {
+    window.addEventListener("visibilitychange", onVisibility);
+  }
+}
+
+function stopRealtime(): void {
+  if (
+    typeof window !== "undefined" &&
+    typeof window.removeEventListener === "function"
+  ) {
+    window.removeEventListener("visibilitychange", onVisibility);
+  }
+  try {
+    source?.close();
+  } catch {
+    // already closed
+  }
+  source = null;
+  stopPolling();
+}
+
 function subscribe(listener: Listener): () => void {
   listeners.add(listener);
   if (listeners.size === 1) {
@@ -475,11 +560,13 @@ function subscribe(listener: Listener): () => void {
     } catch {
       channel = null; // no cross-tab channel (very old browser) — still works
     }
+    startRealtime(); // M12: push from other profiles + the poll fallback
     void refresh(); // first subscriber owns the initial server read
   }
   return () => {
     listeners.delete(listener);
     if (listeners.size === 0) {
+      stopRealtime();
       try {
         channel?.close();
       } catch {

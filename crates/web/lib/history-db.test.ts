@@ -263,3 +263,61 @@ describe("per-message model stamp (M11)", () => {
     expect(saved.messages[1].content).toBe("ok");
   });
 });
+
+describe("onHistoryChange (M12 change feed)", () => {
+  it("notifies on every write: save, import, delete, wipe", () => {
+    let seen = 0;
+    const off = db.onHistoryChange(() => {
+      seen += 1;
+    });
+
+    db.saveSession({ id: "ses_a", model: "llama3.1:8b", messages: [msg("hi")] });
+    expect(seen).toBe(1);
+
+    db.saveSession({ id: "ses_a", model: "llama3.1:8b", messages: [msg("hi"), msg("ok", "assistant")] });
+    expect(seen).toBe(2);
+
+    db.importSessions([{ id: "ses_b", model: "llama3.2:latest", messages: [msg("imported")] }]);
+    expect(seen).toBe(3);
+
+    expect(db.deleteSession("ses_a")).toBe(true);
+    expect(seen).toBe(4);
+
+    expect(db.deleteAll()).toBe(1);
+    expect(seen).toBe(5);
+
+    off();
+  });
+
+  it("stays quiet when nothing changed (no false refetches)", () => {
+    let seen = 0;
+    const off = db.onHistoryChange(() => {
+      seen += 1;
+    });
+    expect(db.deleteSession("never-existed")).toBe(false);
+    expect(db.deleteAll()).toBe(0); // empty table
+    expect(db.importSessions([])).toBe(0);
+    expect(seen).toBe(0);
+    off();
+  });
+
+  it("unsubscribes cleanly and isolates a throwing listener", () => {
+    const seen: string[] = [];
+    const offBad = db.onHistoryChange(() => {
+      throw new Error("broken subscriber");
+    });
+    const offGood = db.onHistoryChange(() => {
+      seen.push("good");
+    });
+
+    // the write still lands and the healthy listener still fires
+    db.saveSession({ id: "ses_a", model: "llama3.1:8b", messages: [msg("hi")] });
+    expect(db.listSessions()).toHaveLength(1);
+    expect(seen).toEqual(["good"]);
+
+    offBad();
+    offGood();
+    db.saveSession({ id: "ses_b", model: "llama3.1:8b", messages: [msg("again")] });
+    expect(seen).toEqual(["good"]); // unsubscribed: no more calls
+  });
+});
