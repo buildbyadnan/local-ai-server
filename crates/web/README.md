@@ -133,12 +133,32 @@ configurations that look odd but are load-bearing:
   cold caches). The proxy rejects unknown slugs before rendering, so invalid
   URLs always return a real `404`.
 
-Styling is one hand-rolled stylesheet (tokens → minimal reset → components),
-no CSS framework. The layout is edge-to-edge: the shell fills the viewport's
-length and breadth, columns scale in four breakpoints with the chat absorbing
-the rest, and below 620px the panels stack into one column with the credit
-bar pinned to the bottom. Every page ends with the credit line
-**Developed by Adnan · github.com/buildbyadnan**.
+Styling is one hand-rolled stylesheet (tokens → fonts → minimal reset →
+components), no CSS framework. The layout is edge-to-edge: the shell fills
+the viewport's length and breadth, columns scale in four breakpoints with
+the chat absorbing the rest, and below 620px the panels stack into one
+column with the credit bar pinned to the bottom. Every page ends with the
+credit line **Developed by Adnan · github.com/buildbyadnan**.
+
+### Nothing leaves this machine
+
+The app talks only to Ollama on `127.0.0.1` — and the build does too:
+
+- **Fonts are vendored.** Geist + Geist Mono live in `public/fonts/` (11
+  woff2 subsets, ~160 KB) with their `@font-face` rules in `globals.css`.
+  `next/font/google` fetches from Google *at build time*; these are the
+  same files it downloaded, so type renders identically with the network
+  unplugged. The two latin faces are preloaded in `app/layout.tsx`.
+- **Next.js's own phone-home is switched off** in `next.config.ts`:
+  telemetry (on by default) and `experimental.agentUpgrade` (defaults to
+  `"security"`, which POSTs advisories to `registry.npmjs.org` on every
+  build).
+
+Verified, not asserted: a full `next build` under `strace` with a global
+`fetch()` hook makes **0 outbound sockets, 0 DNS queries, 0 fetch calls**,
+and the browser-side offline audit walks the chat, directory and guide
+pages, streams a real reply and holds the history stream open — every one
+of its ~110 requests goes to `127.0.0.1`.
 
 ## Repo fit
 

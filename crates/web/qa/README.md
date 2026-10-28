@@ -53,12 +53,15 @@ whatever that machine has.
 | ---- | ------------- | ------ | --- |
 | 2026-10-27 | all 10 | initial capture at M4 | first committed references (M4: real chat history, session rows, hydration states) |
 | 2026-10-27 | all 10 | M9 responsive pass recapture | same routes/viewports, new shell: fluid `min(1680px, 100%)` cap, the four-tier ladder (768–1023 / 1024–1279 / 1280–1599 / ≥1600), sidebar OLLAMA-row overflow fix, modal at `min(720px, 92vw)` — every shot re-taken on the M9 build (first-visit state, hermetic DB reset) |
+| 2026-10-28 | all 10 | M10–M13 recapture | every shot re-taken: edge-to-edge shell (no gutter, hairline separators), 14px/1.65 chat typography, markdown-rendered replies, credit bar on every page, and the vendored Geist/Geist Mono faces from `public/fonts/` (M13) — first-visit state, hermetic DB reset |
 
-## The rest of the QA gate (as of M12)
+## The rest of the QA gate (as of M13)
 
 | Check | Result |
 | ----- | ------ |
 | `tsc --noEmit` / `pnpm lint` | 0 errors / clean |
+| offline build (strace + a global `fetch()` hook over `pnpm build`) | 0 fetch calls, 0 outbound sockets, 0 DNS queries |
+| offline audit (CDP, 14 checks: page walk + vendored-font check + a real streamed reply + history/SSE, every request loopback) | 14/14 pass |
 | M10 shell matrix (CDP, 61 checks: edge-to-edge + credit bar + mobile first screen) | 61/61 pass |
 | M11 readability matrix (CDP, 14 checks: 14px/leading/measure + per-message model) | 14/14 pass |
 | M12 realtime matrix (CDP, 24 checks: two Chrome profiles chat both ways over SSE, cross-profile delete, same-profile tab in 465 ms, 4 s poll fallback with `EventSource` removed) | 24/24 pass |
